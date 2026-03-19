@@ -16,6 +16,30 @@ export default function BudgetsPage() {
   const [limitValue, setLimitValue] = useState('');
   const [copied, setCopied] = useState(false);
 
+  // Inline category name editing
+  const [editingNameId, setEditingNameId] = useState<string | null>(null);
+  const [editingNameValue, setEditingNameValue] = useState('');
+
+  const startEditingName = (catId: string, currentName: string) => {
+    setEditingNameId(catId);
+    setEditingNameValue(currentName);
+  };
+
+  const saveEditingName = () => {
+    if (!editingNameId) return;
+    const trimmed = editingNameValue.trim();
+    if (trimmed && trimmed !== state.categories.find(c => c.id === editingNameId)?.name) {
+      dispatch({ type: 'UPDATE_CATEGORY', payload: { id: editingNameId, changes: { name: trimmed } } });
+    }
+    setEditingNameId(null);
+    setEditingNameValue('');
+  };
+
+  const cancelEditingName = () => {
+    setEditingNameId(null);
+    setEditingNameValue('');
+  };
+
   // Navigate period forward/backward
   const navigatePeriod = (dir: -1 | 1) => {
     if (isYearly) {
@@ -211,7 +235,7 @@ export default function BudgetsPage() {
           return (
             <div
               key={cat.id}
-              className="card-hover bg-white dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/40 shadow-[0_1px_3px_rgba(0,0,0,0.02)] rounded-[20px] p-7 lg:p-8"
+              className="group card-hover bg-white dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/40 shadow-[0_1px_3px_rgba(0,0,0,0.02)] rounded-[20px] p-7 lg:p-8"
             >
               <div className="flex items-center gap-3 mb-6">
                 <div
@@ -220,8 +244,32 @@ export default function BudgetsPage() {
                 >
                   {cat.icon}
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white">{cat.name}</p>
+                <div className="flex-1 min-w-0">
+                  {editingNameId === cat.id ? (
+                    <input
+                      type="text"
+                      value={editingNameValue}
+                      onChange={e => setEditingNameValue(e.target.value)}
+                      onBlur={saveEditingName}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') { e.preventDefault(); saveEditingName(); }
+                        if (e.key === 'Escape') cancelEditingName();
+                      }}
+                      autoFocus
+                      className="text-sm font-semibold text-slate-900 dark:text-white bg-slate-50 dark:bg-slate-700/50 border border-indigo-300 dark:border-indigo-500/50 rounded-lg px-2 py-0.5 w-full focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    />
+                  ) : (
+                    <p
+                      className="text-sm font-semibold text-slate-900 dark:text-white cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors truncate"
+                      onClick={() => startEditingName(cat.id, cat.name)}
+                      title="Click to rename"
+                    >
+                      {cat.name}
+                      <svg className="w-3 h-3 inline-block ml-1.5 opacity-0 group-hover:opacity-100 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                      </svg>
+                    </p>
+                  )}
                   <p className="text-xs text-slate-400 dark:text-slate-500">
                     {data?.count || 0} transaction{(data?.count || 0) !== 1 ? 's' : ''}
                   </p>

@@ -38,6 +38,13 @@ function budgetReducer(state: BudgetState, action: BudgetAction): BudgetState {
       };
     case 'ADD_CATEGORY':
       return { ...state, categories: [...state.categories, action.payload] };
+    case 'UPDATE_CATEGORY':
+      return {
+        ...state,
+        categories: state.categories.map(c =>
+          c.id === action.payload.id ? { ...c, ...action.payload.changes } : c
+        ),
+      };
     case 'REMOVE_CATEGORY':
       return {
         ...state,

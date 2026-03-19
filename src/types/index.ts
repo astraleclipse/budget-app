@@ -57,6 +57,7 @@ export type BudgetAction =
   | { type: 'SET_BUDGET_LIMIT'; payload: BudgetLimit }
   | { type: 'REMOVE_BUDGET_LIMIT'; payload: { categoryId: string; month: string } }
   | { type: 'ADD_CATEGORY'; payload: Category }
+  | { type: 'UPDATE_CATEGORY'; payload: { id: string; changes: Partial<Omit<Category, 'id'>> } }
   | { type: 'REMOVE_CATEGORY'; payload: string }
   | { type: 'ADD_ANALYSIS'; payload: AiAnalysis }
   | { type: 'UPDATE_SETTINGS'; payload: Partial<AppSettings> }
