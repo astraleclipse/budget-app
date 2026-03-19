@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useBudget } from '../../context/BudgetContext';
 import { getCurrentMonth, formatCurrency, formatMonth } from '../../utils/formatters';
-import { getTransactionsForMonth, getTotalIncome, getTotalExpenses, getBalance, getCategoryTotals, getMonthlyTrends, getEffectiveBudgetLimit } from '../../utils/calculations';
+import { getTransactionsForMonth, getTotalIncome, getTotalExpenses, getBalance, getCategoryTotals, getMonthlyTrends, getEffectiveBudgetLimit, getTotalExpectedIncome } from '../../utils/calculations';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, Tooltip, ResponsiveContainer } from 'recharts';
 import { format, subMonths, addMonths } from 'date-fns';
 
@@ -87,6 +87,30 @@ export default function Dashboard() {
   const savingsRate = income > 0 ? ((income - expenses) / income) * 100 : 0;
 
   const budgetMode = state.settings.budgetMode || 'monthly';
+
+  const expectedIncome = useMemo(
+    () => getTotalExpectedIncome(state.budgetLimits, state.categories, selectedMonth, budgetMode),
+    [state.budgetLimits, state.categories, selectedMonth, budgetMode]
+  );
+
+  // Total expense budgets for projected balance
+  const totalExpenseBudgets = useMemo(() => {
+    const expenseCats = state.categories.filter(c => c.type === 'expense');
+    let total = 0;
+    for (const cat of expenseCats) {
+      if (budgetMode === 'yearly') {
+        const yearPeriod = selectedMonth.substring(0, 4);
+        const limit = getEffectiveBudgetLimit(state.budgetLimits, cat.id, yearPeriod, 'yearly');
+        if (limit) total += limit / 12;
+      } else {
+        const limit = getEffectiveBudgetLimit(state.budgetLimits, cat.id, selectedMonth, 'monthly');
+        if (limit) total += limit;
+      }
+    }
+    return total;
+  }, [state.categories, state.budgetLimits, selectedMonth, budgetMode]);
+
+  const projectedBalance = expectedIncome > 0 ? expectedIncome - totalExpenseBudgets : 0;
 
   const categoryTotals = useMemo(
     () => getCategoryTotals(state.transactions, state.categories, state.budgetLimits, selectedMonth, 'expense', budgetMode),
@@ -213,6 +237,16 @@ export default function Dashboard() {
               <p className={`text-2xl font-bold tracking-tight ${dynamicColor}`} style={{ fontFamily: 'var(--font-display)' }}>
                 {card.isPercent ? `${val.toFixed(1)}%` : formatCurrency(val)}
               </p>
+              {card.label === 'Income' && expectedIncome > 0 && (
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
+                  of {formatCurrency(expectedIncome)} expected
+                </p>
+              )}
+              {card.label === 'Balance' && expectedIncome > 0 && (
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
+                  Projected: {formatCurrency(projectedBalance)}
+                </p>
+              )}
             </div>
           );
         })}
