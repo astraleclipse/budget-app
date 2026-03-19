@@ -156,3 +156,24 @@ export function getLargestExpenses(transactions: Transaction[], month: string, l
     .sort((a, b) => b.amount - a.amount)
     .slice(0, limit);
 }
+
+/**
+ * Sum effective budget limits for all income-type categories in a period.
+ * Returns 0 if no income forecasts are set.
+ */
+export function getTotalExpectedIncome(
+  budgetLimits: BudgetLimit[],
+  categories: Category[],
+  period: string,
+  budgetMode: 'monthly' | 'yearly' = 'monthly'
+): number {
+  const incomeCategories = categories.filter(c => c.type === 'income');
+  let total = 0;
+  for (const cat of incomeCategories) {
+    const limit = getEffectiveBudgetLimit(budgetLimits, cat.id, period, budgetMode);
+    if (limit !== undefined && limit > 0) {
+      total += limit;
+    }
+  }
+  return total;
+}
