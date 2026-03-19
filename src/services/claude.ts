@@ -1,5 +1,5 @@
 import type { Transaction, Category, BudgetLimit } from '../types';
-import { getCategoryTotals, getTransactionsForMonth, getTotalIncome, getTotalExpenses, getLargestExpenses } from '../utils/calculations';
+import { getCategoryTotals, getTransactionsForMonth, getTotalIncome, getTotalExpenses, getLargestExpenses, getEffectiveBudgetLimit, getTotalExpectedIncome } from '../utils/calculations';
 import { formatCurrency } from '../utils/formatters';
 import { format, subMonths } from 'date-fns';
 
@@ -16,11 +16,15 @@ Rules:
 - Prioritize high-impact suggestions (biggest potential savings first)
 - Format your response in clear markdown with headers and bullet points
 - Include a brief summary section at the top with key numbers
+- If expected income data is provided, analyze forecast vs. actual income, flag variances (received more or less than expected), and factor the forecast into savings recommendations and projected surplus/deficit
 - End with 3 specific action items the user can take this month
 
 Structure your response as:
 ## Summary
 Key numbers: total income, total expenses, savings rate, biggest category
+
+## Income Forecast (if applicable)
+Expected vs. actual income, variance analysis, and what it means for the budget
 
 ## Where You're Doing Well
 Categories that are within or under budget
@@ -86,6 +90,31 @@ export function buildAnalysisPrompt(
     '### Income',
     ...incomeTotals.map(i => `- ${i.categoryName}: ${formatCurrency(i.total)} (${i.count} transactions)`),
     ...(incomeTotals.length === 0 ? ['- No income recorded'] : []),
+  ];
+
+  // Income forecast data
+  const incomeCategories = categories.filter(c => c.type === 'income');
+  const incomeForecastLines: string[] = [];
+  let totalExpected = 0;
+  for (const cat of incomeCategories) {
+    const expected = getEffectiveBudgetLimit(budgetLimits, cat.id, month, 'monthly');
+    if (expected && expected > 0) {
+      const actual = incomeTotals.find(i => i.categoryId === cat.id)?.total || 0;
+      const pct = ((actual / expected) * 100).toFixed(0);
+      incomeForecastLines.push(`- ${cat.name}: Expected ${formatCurrency(expected)}, Received ${formatCurrency(actual)} (${pct}%)`);
+      totalExpected += expected;
+    }
+  }
+
+  if (incomeForecastLines.length > 0) {
+    lines.push('', '### Expected Income Forecast');
+    lines.push(`Total Expected: ${formatCurrency(totalExpected)}`);
+    lines.push(`Total Received: ${formatCurrency(totalIncome)}`);
+    lines.push(`Variance: ${formatCurrency(totalIncome - totalExpected)} (${totalExpected > 0 ? ((totalIncome / totalExpected) * 100).toFixed(0) : 0}% of forecast)`);
+    lines.push(...incomeForecastLines);
+  }
+
+  lines.push(
     '',
     '### Expenses by Category',
     ...expenseTotals.map(e =>
@@ -111,7 +140,7 @@ export function buildAnalysisPrompt(
       return `${i + 1}. ${formatCurrency(t.amount)} - ${t.description} (${cat?.name || t.category})`;
     }),
     ...(largestExpenses.length === 0 ? ['- No expenses recorded'] : []),
-  ];
+  );
 
   return lines.join('\n');
 }
