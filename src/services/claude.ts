@@ -1,5 +1,5 @@
 import type { Transaction, Category, BudgetLimit } from '../types';
-import { getCategoryTotals, getTransactionsForMonth, getTotalIncome, getTotalExpenses, getLargestExpenses, getEffectiveBudgetLimit, getTotalExpectedIncome } from '../utils/calculations';
+import { getCategoryTotals, getTransactionsForMonth, getTotalIncome, getTotalExpenses, getLargestExpenses, getEffectiveBudgetLimit } from '../utils/calculations';
 import { formatCurrency } from '../utils/formatters';
 import { format, subMonths } from 'date-fns';
 
@@ -68,15 +68,16 @@ export function buildAnalysisPrompt(
   transactions: Transaction[],
   categories: Category[],
   budgetLimits: BudgetLimit[],
-  month: string
+  month: string,
+  budgetMode: 'monthly' | 'yearly' = 'monthly'
 ): string {
   const monthTx = getTransactionsForMonth(transactions, month);
   const totalIncome = getTotalIncome(monthTx);
   const totalExpenses = getTotalExpenses(monthTx);
   const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome) * 100 : 0;
 
-  const expenseTotals = getCategoryTotals(transactions, categories, budgetLimits, month, 'expense');
-  const incomeTotals = getCategoryTotals(transactions, categories, budgetLimits, month, 'income');
+  const expenseTotals = getCategoryTotals(transactions, categories, budgetLimits, month, 'expense', budgetMode);
+  const incomeTotals = getCategoryTotals(transactions, categories, budgetLimits, month, 'income', budgetMode);
   const largestExpenses = getLargestExpenses(transactions, month, 5);
 
   const prevMonth = format(subMonths(new Date(month + '-01'), 1), 'yyyy-MM');
@@ -97,7 +98,7 @@ export function buildAnalysisPrompt(
   const incomeForecastLines: string[] = [];
   let totalExpected = 0;
   for (const cat of incomeCategories) {
-    const expected = getEffectiveBudgetLimit(budgetLimits, cat.id, month, 'monthly');
+    const expected = getEffectiveBudgetLimit(budgetLimits, cat.id, month, budgetMode);
     if (expected && expected > 0) {
       const actual = incomeTotals.find(i => i.categoryId === cat.id)?.total || 0;
       const pct = ((actual / expected) * 100).toFixed(0);

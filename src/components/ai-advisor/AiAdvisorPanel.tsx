@@ -22,7 +22,8 @@ export default function AiAdvisorPanel() {
     setCurrentResult(null);
 
     try {
-      const prompt = buildAnalysisPrompt(state.transactions, state.categories, state.budgetLimits, month);
+      const budgetMode = state.settings.budgetMode || 'monthly';
+      const prompt = buildAnalysisPrompt(state.transactions, state.categories, state.budgetLimits, month, budgetMode);
       const response = await callClaudeApi(state.settings.claudeApiKey, prompt, state.settings.claudeModel);
       setCurrentResult(response);
       dispatch({

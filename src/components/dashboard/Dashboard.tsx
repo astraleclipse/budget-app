@@ -117,17 +117,17 @@ export default function Dashboard() {
     [state.transactions, state.categories, state.budgetLimits, selectedMonth, budgetMode]
   );
 
-  const getEffectiveBudget = (categoryId: string) => {
-    if (budgetMode === 'yearly') {
-      const yearPeriod = selectedMonth.substring(0, 4);
-      const yearlyLimit = getEffectiveBudgetLimit(state.budgetLimits, categoryId, yearPeriod, 'yearly');
-      return yearlyLimit ? yearlyLimit / 12 : 0;
-    }
-    const monthlyLimit = getEffectiveBudgetLimit(state.budgetLimits, categoryId, selectedMonth, 'monthly');
-    return monthlyLimit || 0;
-  };
-
   const budgetVsActuals = useMemo(() => {
+    const getEffectiveBudget = (categoryId: string) => {
+      if (budgetMode === 'yearly') {
+        const yearPeriod = selectedMonth.substring(0, 4);
+        const yearlyLimit = getEffectiveBudgetLimit(state.budgetLimits, categoryId, yearPeriod, 'yearly');
+        return yearlyLimit ? yearlyLimit / 12 : 0;
+      }
+      const monthlyLimit = getEffectiveBudgetLimit(state.budgetLimits, categoryId, selectedMonth, 'monthly');
+      return monthlyLimit || 0;
+    };
+
     const expenseCats = state.categories.filter(c => c.type === 'expense');
     const data: { name: string; budget: number; actual: number; color: string }[] = [];
     for (const cat of expenseCats) {
