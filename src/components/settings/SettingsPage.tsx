@@ -176,18 +176,17 @@ export default function SettingsPage() {
               </button>
             </div>
             <select
-              value={state.settings.claudeModel || 'claude-sonnet-4-5-20250929'}
+              value={state.settings.claudeModel || 'claude-sonnet-5'}
               onChange={e => dispatch({ type: 'UPDATE_SETTINGS', payload: { claudeModel: e.target.value } })}
               className={inputClasses}
             >
-              <optgroup label="Claude 4">
-                <option value="claude-opus-4-0-20250514">Claude Opus 4 (Most capable)</option>
-                <option value="claude-sonnet-4-5-20250929">Claude Sonnet 4.5 (Recommended)</option>
-                <option value="claude-sonnet-4-0-20250514">Claude Sonnet 4</option>
+              <optgroup label="Claude Fable 5">
+                <option value="claude-fable-5">Claude Fable 5 (Most capable)</option>
               </optgroup>
-              <optgroup label="Claude 3.5">
-                <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
-                <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Fastest, cheapest)</option>
+              <optgroup label="Claude 4.x">
+                <option value="claude-opus-4-8">Claude Opus 4.8 (Complex agentic)</option>
+                <option value="claude-sonnet-5">Claude Sonnet 5 (Recommended)</option>
+                <option value="claude-haiku-4-5">Claude Haiku 4.5 (Fastest, cheapest)</option>
               </optgroup>
             </select>
           </div>
@@ -219,20 +218,25 @@ export default function SettingsPage() {
               </button>
             </div>
             <select
-              value={state.settings.openAiModel || 'gpt-4o'}
+              value={state.settings.openAiModel || 'gpt-5.6'}
               onChange={e => dispatch({ type: 'UPDATE_SETTINGS', payload: { openAiModel: e.target.value } })}
               className={inputClasses}
             >
-              <optgroup label="GPT-4o">
-                <option value="gpt-4o">GPT-4o (Recommended)</option>
-                <option value="gpt-4o-mini">GPT-4o mini (Fastest, cheapest)</option>
+              <optgroup label="GPT-5.6 (Latest)">
+                <option value="gpt-5.6">GPT-5.6 Sol (Most capable)</option>
+                <option value="gpt-5.6-terra">GPT-5.6 Terra (Balanced)</option>
+                <option value="gpt-5.6-luna">GPT-5.6 Luna (Fastest)</option>
               </optgroup>
-              <optgroup label="GPT-4">
-                <option value="gpt-4-turbo">GPT-4 Turbo</option>
-                <option value="gpt-4">GPT-4</option>
+              <optgroup label="GPT-5.5">
+                <option value="gpt-5.5">GPT-5.5</option>
+                <option value="gpt-5.5-pro">GPT-5.5 Pro (Highest quality)</option>
               </optgroup>
-              <optgroup label="GPT-3.5">
-                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+              <optgroup label="GPT-5.4">
+                <option value="gpt-5.4">GPT-5.4</option>
+                <option value="gpt-5.4-mini">GPT-5.4 Mini (Cheapest)</option>
+              </optgroup>
+              <optgroup label="Coding">
+                <option value="gpt-5.3-codex">GPT-5.3 Codex (Code/agents)</option>
               </optgroup>
             </select>
           </div>

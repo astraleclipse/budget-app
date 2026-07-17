@@ -69,13 +69,13 @@ export async function callAiApi(settings: AppSettings, userMessage: string): Pro
     return callAnthropicApi(
       settings.claudeApiKey,
       userMessage,
-      settings.claudeModel || 'claude-sonnet-4-5-20250929',
+      settings.claudeModel || 'claude-sonnet-5',
     );
   } else if (provider === 'openai') {
     return callOpenAiCompatibleApi(
       settings.openAiApiKey,
       userMessage,
-      settings.openAiModel || 'gpt-4o',
+      settings.openAiModel || 'gpt-5.6',
       OPENAI_URL,
     );
   } else {
@@ -101,7 +101,7 @@ export async function testAiConnection(settings: AppSettings): Promise<void> {
         'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
-        model: settings.claudeModel || 'claude-sonnet-4-5-20250929',
+        model: settings.claudeModel || 'claude-sonnet-5',
         max_tokens: 10,
         messages: [{ role: 'user', content: 'Say "ok"' }],
       }),

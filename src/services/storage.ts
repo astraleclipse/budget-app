@@ -13,9 +13,9 @@ export function getDefaultState(): BudgetState {
     settings: {
       aiProvider: 'anthropic' as const,
       claudeApiKey: '',
-      claudeModel: 'claude-sonnet-4-5-20250929',
+      claudeModel: 'claude-sonnet-5',
       openAiApiKey: '',
-      openAiModel: 'gpt-4o',
+      openAiModel: 'gpt-5.6',
       localAiBaseUrl: 'http://localhost:11434/v1',
       localAiModel: '',
       theme: 'light',
