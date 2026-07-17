@@ -6,7 +6,7 @@ import { format, subMonths } from 'date-fns';
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const DEFAULT_MODEL = 'claude-sonnet-4-5-20250929';
 
-const SYSTEM_PROMPT = `You are a personal finance advisor AI embedded in a budget tracking app.
+export const SYSTEM_PROMPT = `You are a personal finance advisor AI embedded in a budget tracking app.
 Your job is to analyze the user's spending data and provide specific, actionable savings recommendations.
 
 Rules:

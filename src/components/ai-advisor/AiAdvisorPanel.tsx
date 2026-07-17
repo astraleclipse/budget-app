@@ -3,7 +3,8 @@ import { v4 as uuidv4 } from 'uuid';
 import Markdown from 'react-markdown';
 import { useBudget } from '../../context/BudgetContext';
 import { getCurrentMonth, formatMonth } from '../../utils/formatters';
-import { callClaudeApi, buildAnalysisPrompt } from '../../services/claude';
+import { callAiApi, hasValidAiConfig } from '../../services/ai';
+import { buildAnalysisPrompt } from '../../services/claude';
 
 export default function AiAdvisorPanel() {
   const { state, dispatch } = useBudget();
@@ -12,7 +13,7 @@ export default function AiAdvisorPanel() {
   const [error, setError] = useState<string | null>(null);
   const [currentResult, setCurrentResult] = useState<string | null>(null);
 
-  const hasApiKey = !!state.settings.claudeApiKey;
+  const hasApiKey = hasValidAiConfig(state.settings);
   const hasTransactions = state.transactions.length >= 3;
 
   const handleAnalyze = async () => {
@@ -24,7 +25,7 @@ export default function AiAdvisorPanel() {
     try {
       const budgetMode = state.settings.budgetMode || 'monthly';
       const prompt = buildAnalysisPrompt(state.transactions, state.categories, state.budgetLimits, month, budgetMode);
-      const response = await callClaudeApi(state.settings.claudeApiKey, prompt, state.settings.claudeModel);
+      const response = await callAiApi(state.settings, prompt);
       setCurrentResult(response);
       dispatch({
         type: 'ADD_ANALYSIS',
@@ -58,7 +59,7 @@ export default function AiAdvisorPanel() {
           <div>
             <p className="text-sm font-medium text-amber-900 dark:text-amber-200">API Key Required</p>
             <p className="text-xs text-amber-700/70 dark:text-amber-300/60 mt-0.5">
-              Go to Settings and add your Anthropic API key to enable AI-powered spending analysis.
+              Go to Settings and configure your AI provider to enable AI-powered spending analysis.
             </p>
           </div>
         </div>

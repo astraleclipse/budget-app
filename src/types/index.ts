@@ -34,9 +34,16 @@ export interface AiAnalysis {
   response: string;
 }
 
+export type AiProvider = 'anthropic' | 'openai' | 'local';
+
 export interface AppSettings {
+  aiProvider: AiProvider;
   claudeApiKey: string;
   claudeModel: string;
+  openAiApiKey: string;
+  openAiModel: string;
+  localAiBaseUrl: string;
+  localAiModel: string;
   theme: 'light' | 'dark';
   currency: string;
   budgetMode: 'monthly' | 'yearly';
