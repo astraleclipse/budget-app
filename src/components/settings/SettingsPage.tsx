@@ -2,12 +2,16 @@ import { useState, useRef, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useBudget } from '../../context/BudgetContext';
 import { exportData, importData } from '../../services/storage';
+import { testAiConnection } from '../../services/ai';
 import { getAllLearnedRules, deleteLearnedRule, clearAllLearnedRules, type LearnedRule } from '../../services/learnedRules';
-import type { Category, TransactionType } from '../../types';
+import type { AiProvider, Category, TransactionType } from '../../types';
 
 export default function SettingsPage() {
   const { state, dispatch } = useBudget();
-  const [apiKey, setApiKey] = useState(state.settings.claudeApiKey);
+  const [anthropicKey, setAnthropicKey] = useState(state.settings.claudeApiKey || '');
+  const [openAiKey, setOpenAiKey] = useState(state.settings.openAiApiKey || '');
+  const [localBaseUrl, setLocalBaseUrl] = useState(state.settings.localAiBaseUrl || 'http://localhost:11434/v1');
+  const [localModel, setLocalModel] = useState(state.settings.localAiModel || '');
   const [apiKeyVisible, setApiKeyVisible] = useState(false);
   const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
   const [testing, setTesting] = useState(false);
@@ -41,32 +45,29 @@ export default function SettingsPage() {
     return cat ? `${cat.icon} ${cat.name}` : catId;
   };
 
-  const handleSaveApiKey = () => {
-    dispatch({ type: 'UPDATE_SETTINGS', payload: { claudeApiKey: apiKey } });
+  const handleSaveAiSettings = () => {
+    dispatch({ type: 'UPDATE_SETTINGS', payload: {
+      claudeApiKey: anthropicKey,
+      openAiApiKey: openAiKey,
+      localAiBaseUrl: localBaseUrl,
+      localAiModel: localModel,
+    }});
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
 
   const handleTestApiKey = async () => {
-    if (!apiKey) return;
     setTesting(true);
     setTestResult(null);
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({
-          model: state.settings.claudeModel || 'claude-sonnet-4-5-20250929',
-          max_tokens: 10,
-          messages: [{ role: 'user', content: 'Say "ok"' }],
-        }),
+      await testAiConnection({
+        ...state.settings,
+        claudeApiKey: anthropicKey,
+        openAiApiKey: openAiKey,
+        localAiBaseUrl: localBaseUrl,
+        localAiModel: localModel,
       });
-      setTestResult(res.ok ? 'success' : 'error');
+      setTestResult('success');
     } catch {
       setTestResult('error');
     } finally {
@@ -97,7 +98,10 @@ export default function SettingsPage() {
       const result = importData(reader.result as string);
       if (result) {
         dispatch({ type: 'IMPORT_DATA', payload: result });
-        setApiKey(result.settings.claudeApiKey || '');
+        setAnthropicKey(result.settings.claudeApiKey || '');
+        setOpenAiKey(result.settings.openAiApiKey || '');
+        setLocalBaseUrl(result.settings.localAiBaseUrl || 'http://localhost:11434/v1');
+        setLocalModel(result.settings.localAiModel || '');
         setImportMsg('Data imported successfully!');
       } else {
         setImportMsg('Invalid backup file. Please check the format.');
@@ -113,46 +117,161 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-8 max-w-2xl">
-      {/* API Key */}
+      {/* AI Provider */}
       <section className={sectionClasses}>
         <div className="flex items-start gap-4 mb-8">
           <div className="w-11 h-11 rounded-2xl bg-violet-100 dark:bg-violet-500/15 flex items-center justify-center shrink-0">
             <svg className="w-5 h-5 text-violet-600 dark:text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
             </svg>
           </div>
           <div>
-            <h3 className="text-[15px] font-semibold text-slate-900 dark:text-white">Claude API Key</h3>
+            <h3 className="text-[15px] font-semibold text-slate-900 dark:text-white">AI Provider</h3>
             <p className="text-sm text-slate-400 dark:text-slate-500 mt-1 leading-relaxed">
-              Required for AI spending analysis. Stored locally and only sent to Anthropic's API.
+              Choose your AI provider for spending analysis. Keys are stored locally and never shared.
             </p>
           </div>
         </div>
-        <div className="flex gap-3">
-          <div className="relative flex-1">
-            <input
-              type={apiKeyVisible ? 'text' : 'password'}
-              value={apiKey}
-              onChange={e => { setApiKey(e.target.value); setSaved(false); }}
-              placeholder="sk-ant-..."
-              className={`${inputClasses} pr-12`}
-            />
+
+        {/* Provider tabs */}
+        <div className="flex gap-2 mb-6 p-1 bg-slate-100 dark:bg-slate-900/30 rounded-2xl">
+          {(['anthropic', 'openai', 'local'] as AiProvider[]).map(p => (
             <button
-              type="button"
-              onClick={() => setApiKeyVisible(!apiKeyVisible)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors rounded-lg"
+              key={p}
+              onClick={() => dispatch({ type: 'UPDATE_SETTINGS', payload: { aiProvider: p } })}
+              className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all ${
+                (state.settings.aiProvider || 'anthropic') === p
+                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+              }`}
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                {apiKeyVisible ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                )}
-              </svg>
+              {p === 'anthropic' ? 'Anthropic' : p === 'openai' ? 'OpenAI' : 'Local LLM'}
             </button>
+          ))}
+        </div>
+
+        {/* Anthropic */}
+        {(state.settings.aiProvider || 'anthropic') === 'anthropic' && (
+          <div className="space-y-4">
+            <div className="relative">
+              <input
+                type={apiKeyVisible ? 'text' : 'password'}
+                value={anthropicKey}
+                onChange={e => { setAnthropicKey(e.target.value); setSaved(false); }}
+                placeholder="sk-ant-..."
+                className={`${inputClasses} pr-12`}
+              />
+              <button
+                type="button"
+                onClick={() => setApiKeyVisible(!apiKeyVisible)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors rounded-lg"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  {apiKeyVisible ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  )}
+                </svg>
+              </button>
+            </div>
+            <select
+              value={state.settings.claudeModel || 'claude-sonnet-5'}
+              onChange={e => dispatch({ type: 'UPDATE_SETTINGS', payload: { claudeModel: e.target.value } })}
+              className={inputClasses}
+            >
+              <optgroup label="Claude Fable 5">
+                <option value="claude-fable-5">Claude Fable 5 (Most capable)</option>
+              </optgroup>
+              <optgroup label="Claude 4.x">
+                <option value="claude-opus-4-8">Claude Opus 4.8 (Complex agentic)</option>
+                <option value="claude-sonnet-5">Claude Sonnet 5 (Recommended)</option>
+                <option value="claude-haiku-4-5">Claude Haiku 4.5 (Fastest, cheapest)</option>
+              </optgroup>
+            </select>
           </div>
+        )}
+
+        {/* OpenAI */}
+        {state.settings.aiProvider === 'openai' && (
+          <div className="space-y-4">
+            <div className="relative">
+              <input
+                type={apiKeyVisible ? 'text' : 'password'}
+                value={openAiKey}
+                onChange={e => { setOpenAiKey(e.target.value); setSaved(false); }}
+                placeholder="sk-..."
+                className={`${inputClasses} pr-12`}
+              />
+              <button
+                type="button"
+                onClick={() => setApiKeyVisible(!apiKeyVisible)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors rounded-lg"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  {apiKeyVisible ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  )}
+                </svg>
+              </button>
+            </div>
+            <select
+              value={state.settings.openAiModel || 'gpt-5.6'}
+              onChange={e => dispatch({ type: 'UPDATE_SETTINGS', payload: { openAiModel: e.target.value } })}
+              className={inputClasses}
+            >
+              <optgroup label="GPT-5.6 (Latest)">
+                <option value="gpt-5.6">GPT-5.6 Sol (Most capable)</option>
+                <option value="gpt-5.6-terra">GPT-5.6 Terra (Balanced)</option>
+                <option value="gpt-5.6-luna">GPT-5.6 Luna (Fastest)</option>
+              </optgroup>
+              <optgroup label="GPT-5.5">
+                <option value="gpt-5.5">GPT-5.5</option>
+                <option value="gpt-5.5-pro">GPT-5.5 Pro (Highest quality)</option>
+              </optgroup>
+              <optgroup label="GPT-5.4">
+                <option value="gpt-5.4">GPT-5.4</option>
+                <option value="gpt-5.4-mini">GPT-5.4 Mini (Cheapest)</option>
+              </optgroup>
+              <optgroup label="Coding">
+                <option value="gpt-5.3-codex">GPT-5.3 Codex (Code/agents)</option>
+              </optgroup>
+            </select>
+          </div>
+        )}
+
+        {/* Local LLM */}
+        {state.settings.aiProvider === 'local' && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 ml-1">Base URL</label>
+              <input
+                type="text"
+                value={localBaseUrl}
+                onChange={e => { setLocalBaseUrl(e.target.value); setSaved(false); }}
+                placeholder="http://localhost:11434/v1"
+                className={inputClasses}
+              />
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5 ml-1">Compatible with Ollama, LM Studio, and any OpenAI-compatible server.</p>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 ml-1">Model name</label>
+              <input
+                type="text"
+                value={localModel}
+                onChange={e => { setLocalModel(e.target.value); setSaved(false); }}
+                placeholder="e.g. llama3, mistral, phi3"
+                className={inputClasses}
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-3 mt-5">
           <button
-            onClick={handleSaveApiKey}
+            onClick={handleSaveAiSettings}
             className={`px-5 py-3 rounded-2xl text-sm font-semibold transition-colors ${
               saved
                 ? 'bg-emerald-600 text-white'
@@ -163,49 +282,17 @@ export default function SettingsPage() {
           </button>
           <button
             onClick={handleTestApiKey}
-            disabled={!apiKey || testing}
+            disabled={testing}
             className="px-5 py-3 border border-slate-200 dark:border-slate-700/50 rounded-2xl text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/40 disabled:opacity-40 transition-colors"
           >
-            {testing ? 'Testing...' : 'Test'}
+            {testing ? 'Testing...' : 'Test Connection'}
           </button>
         </div>
         {testResult && (
           <p className={`text-sm mt-3 ${testResult === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-            {testResult === 'success' ? 'API key is valid!' : 'Invalid API key or connection error.'}
+            {testResult === 'success' ? '✓ Connection successful!' : '✗ Connection failed. Check your settings.'}
           </p>
         )}
-      </section>
-
-      {/* AI Model Selection */}
-      <section className={sectionClasses}>
-        <div className="flex items-start gap-4 mb-8">
-          <div className="w-11 h-11 rounded-2xl bg-indigo-100 dark:bg-indigo-500/15 flex items-center justify-center shrink-0">
-            <svg className="w-5 h-5 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-          </div>
-          <div>
-            <h3 className="text-[15px] font-semibold text-slate-900 dark:text-white">AI Model</h3>
-            <p className="text-sm text-slate-400 dark:text-slate-500 mt-1 leading-relaxed">
-              More capable models provide deeper insights but may cost more per request.
-            </p>
-          </div>
-        </div>
-        <select
-          value={state.settings.claudeModel || 'claude-sonnet-4-5-20250929'}
-          onChange={e => dispatch({ type: 'UPDATE_SETTINGS', payload: { claudeModel: e.target.value } })}
-          className={inputClasses}
-        >
-          <optgroup label="Claude 4">
-            <option value="claude-opus-4-0-20250514">Claude Opus 4 (Most capable)</option>
-            <option value="claude-sonnet-4-5-20250929">Claude Sonnet 4.5 (Recommended)</option>
-            <option value="claude-sonnet-4-0-20250514">Claude Sonnet 4</option>
-          </optgroup>
-          <optgroup label="Claude 3.5">
-            <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
-            <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Fastest, cheapest)</option>
-          </optgroup>
-        </select>
       </section>
 
       {/* Storage Info */}
