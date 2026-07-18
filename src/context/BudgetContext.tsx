@@ -67,6 +67,20 @@ function budgetReducer(state: BudgetState, action: BudgetAction): BudgetState {
       return action.payload;
     case 'RESET_ALL':
       return getDefaultState();
+    case 'ADD_RECURRING':
+      return { ...state, recurringTransactions: [...(state.recurringTransactions || []), action.payload] };
+    case 'UPDATE_RECURRING':
+      return {
+        ...state,
+        recurringTransactions: (state.recurringTransactions || []).map(r =>
+          r.id === action.payload.id ? action.payload : r
+        ),
+      };
+    case 'DELETE_RECURRING':
+      return {
+        ...state,
+        recurringTransactions: (state.recurringTransactions || []).filter(r => r.id !== action.payload),
+      };
     default:
       return state;
   }

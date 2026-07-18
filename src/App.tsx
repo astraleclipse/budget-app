@@ -9,6 +9,7 @@ import BudgetsPage from './components/budgets/BudgetsPage';
 import AiAdvisorPanel from './components/ai-advisor/AiAdvisorPanel';
 import CsvImportPage from './components/import/CsvImportPage';
 import SettingsPage from './components/settings/SettingsPage';
+import RecurringPage from './components/recurring/RecurringPage';
 
 const PAGE_TITLES: Record<string, string> = {
   dashboard: 'Dashboard',
@@ -17,6 +18,7 @@ const PAGE_TITLES: Record<string, string> = {
   advisor: 'AI Advisor',
   import: 'Import CSV',
   settings: 'Settings',
+  recurring: 'Bills & Recurring',
 };
 
 function AppContent() {
@@ -61,6 +63,7 @@ function AppContent() {
           {page === 'advisor' && <AiAdvisorPanel />}
           {page === 'import' && <CsvImportPage />}
           {page === 'settings' && <SettingsPage />}
+          {page === 'recurring' && <RecurringPage />}
         </main>
       </div>
     </div>
