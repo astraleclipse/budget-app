@@ -2,8 +2,9 @@ import { useState, useMemo } from 'react';
 import { useBudget } from '../../context/BudgetContext';
 import { getCurrentMonth, formatCurrency, formatMonth } from '../../utils/formatters';
 import { getTransactionsForMonth, getTotalIncome, getTotalExpenses, getBalance, getCategoryTotals, getMonthlyTrends, getEffectiveBudgetLimit, getTotalExpectedIncome } from '../../utils/calculations';
+import { getUpcomingBills, frequencyLabel } from '../../utils/recurring';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, Tooltip, ResponsiveContainer } from 'recharts';
-import { format, subMonths, addMonths } from 'date-fns';
+import { format, subMonths, addMonths, parseISO } from 'date-fns';
 
 const SUMMARY_CARDS = [
   {
@@ -157,6 +158,11 @@ export default function Dashboard() {
 
   const recentTx = useMemo(() => [...monthTx].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8), [monthTx]);
   const catMap = new Map(state.categories.map(c => [c.id, c]));
+
+  const upcomingBills = useMemo(
+    () => getUpcomingBills(state.recurringTransactions ?? [], 7),
+    [state.recurringTransactions]
+  );
 
   const values = [income, expenses, balance, savingsRate];
 
@@ -344,6 +350,38 @@ export default function Dashboard() {
           <p className="text-slate-400 text-sm text-center py-6">No transactions for this month</p>
         )}
       </div>
+
+      {/* Upcoming bills widget */}
+      {upcomingBills.length > 0 && (
+        <div className="bg-white dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/40 shadow-[0_1px_3px_rgba(0,0,0,0.02)] rounded-[20px] p-8 lg:p-10">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-[15px] font-semibold text-slate-900 dark:text-white">Upcoming Bills — Next 7 Days</h3>
+            <a href="#recurring" className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">View all →</a>
+          </div>
+          <div className="space-y-2">
+            {upcomingBills.map(({ recurring: r, dueDate }) => {
+              const cat = catMap.get(r.category);
+              return (
+                <div key={r.id + format(dueDate, 'yyyy-MM-dd')} className="flex items-center gap-3 py-2 px-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors">
+                  <div
+                    className="w-9 h-9 rounded-xl flex items-center justify-center text-sm shrink-0"
+                    style={{ backgroundColor: (cat?.color ?? '#6b7280') + '18', color: cat?.color ?? '#6b7280' }}
+                  >
+                    {cat?.icon ?? '💰'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-medium text-slate-900 dark:text-white truncate">{r.name}</p>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500">{format(dueDate, 'EEE, MMM d')} · {frequencyLabel(r.frequency)}</p>
+                  </div>
+                  <p className={`text-[13px] font-semibold tabular-nums ${r.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                    {r.type === 'income' ? '+' : '-'}{formatCurrency(r.amount)}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

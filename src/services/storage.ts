@@ -10,6 +10,7 @@ export function getDefaultState(): BudgetState {
     categories: [...DEFAULT_CATEGORIES],
     budgetLimits: [],
     analyses: [],
+    recurringTransactions: [],
     settings: {
       aiProvider: 'anthropic' as const,
       claudeApiKey: '',
@@ -43,6 +44,7 @@ export function loadState(): BudgetState {
       ...getDefaultState(),
       ...parsed,
       categories: mergedCategories,
+      recurringTransactions: Array.isArray(parsed.recurringTransactions) ? parsed.recurringTransactions : [],
       settings: { ...getDefaultState().settings, ...parsed.settings },
     };
   } catch {

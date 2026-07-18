@@ -1,5 +1,22 @@
 export type TransactionType = 'income' | 'expense' | 'transfer';
 
+export type RecurringFrequency = 'weekly' | 'fortnightly' | 'monthly' | 'quarterly' | 'yearly';
+
+export interface RecurringTransaction {
+  id: string;
+  name: string;
+  amount: number;
+  type: TransactionType;
+  category: string;
+  frequency: RecurringFrequency;
+  startDate: string;       // 'yyyy-MM-dd'
+  nextDueDate: string;     // 'yyyy-MM-dd'
+  active: boolean;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Transaction {
   id: string;
   type: TransactionType;
@@ -55,6 +72,7 @@ export interface BudgetState {
   budgetLimits: BudgetLimit[];
   analyses: AiAnalysis[];
   settings: AppSettings;
+  recurringTransactions: RecurringTransaction[];
 }
 
 export type BudgetAction =
@@ -71,4 +89,7 @@ export type BudgetAction =
   | { type: 'BATCH_ADD_TRANSACTIONS'; payload: Transaction[] }
   | { type: 'BATCH_UPDATE_TRANSACTIONS'; payload: Transaction[] }
   | { type: 'IMPORT_DATA'; payload: BudgetState }
-  | { type: 'RESET_ALL' };
+  | { type: 'RESET_ALL' }
+  | { type: 'ADD_RECURRING'; payload: RecurringTransaction }
+  | { type: 'UPDATE_RECURRING'; payload: RecurringTransaction }
+  | { type: 'DELETE_RECURRING'; payload: string };
