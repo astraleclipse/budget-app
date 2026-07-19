@@ -1,10 +1,10 @@
 import { useState, useMemo } from 'react';
 import { useBudget } from '../../context/BudgetContext';
 import { getCurrentMonth, formatCurrency, formatMonth } from '../../utils/formatters';
-import { getTransactionsForMonth, getTotalIncome, getTotalExpenses, getBalance, getCategoryTotals, getMonthlyTrends, getEffectiveBudgetLimit, getTotalExpectedIncome } from '../../utils/calculations';
+import { getTransactionsForMonth, getTotalIncome, getTotalExpenses, getBalance, getCategoryTotals, getMonthlyTrends, getEffectiveBudgetLimit, getTotalExpectedIncome, getFinancialHealthScore } from '../../utils/calculations';
 import { getUpcomingBills, frequencyLabel } from '../../utils/recurring';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, Tooltip, ResponsiveContainer } from 'recharts';
-import { format, subMonths, addMonths, parseISO } from 'date-fns';
+import { format, subMonths, addMonths, subDays, parseISO, isWithinInterval } from 'date-fns';
 
 const SUMMARY_CARDS = [
   {
@@ -57,6 +57,9 @@ const SUMMARY_CARDS = [
 export default function Dashboard() {
   const { state } = useBudget();
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
+  const [simIncomePct, setSimIncomePct] = useState(0);
+  const [simExpensePct, setSimExpensePct] = useState(0);
+  const [simMonths, setSimMonths] = useState(6);
 
   const availableMonths = useMemo(() => {
     const months = new Set<string>();
@@ -118,6 +121,11 @@ export default function Dashboard() {
     [state.transactions, state.categories, state.budgetLimits, selectedMonth, budgetMode]
   );
 
+  const financialHealth = useMemo(
+    () => getFinancialHealthScore(state.transactions, state.categories, state.budgetLimits, selectedMonth, budgetMode),
+    [state.transactions, state.categories, state.budgetLimits, selectedMonth, budgetMode]
+  );
+
   const budgetVsActuals = useMemo(() => {
     const getEffectiveBudget = (categoryId: string) => {
       if (budgetMode === 'yearly') {
@@ -158,6 +166,165 @@ export default function Dashboard() {
 
   const recentTx = useMemo(() => [...monthTx].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8), [monthTx]);
   const catMap = new Map(state.categories.map(c => [c.id, c]));
+
+  const fortnightlyBrief = useMemo(() => {
+    const now = new Date();
+    const currentStart = subDays(now, 13);
+    const previousEnd = subDays(currentStart, 1);
+    const previousStart = subDays(previousEnd, 13);
+
+    const inRange = (dateStr: string, start: Date, end: Date) => {
+      const parsed = parseISO(dateStr);
+      return isWithinInterval(parsed, { start, end });
+    };
+
+    const currentWindow = state.transactions.filter(t => inRange(t.date, currentStart, now));
+    const previousWindow = state.transactions.filter(t => inRange(t.date, previousStart, previousEnd));
+
+    const currentIncome = getTotalIncome(currentWindow);
+    const currentExpenses = getTotalExpenses(currentWindow);
+    const currentNet = currentIncome - currentExpenses;
+    const currentSavingsRate = currentIncome > 0 ? (currentNet / currentIncome) * 100 : 0;
+
+    const previousIncome = getTotalIncome(previousWindow);
+    const previousExpenses = getTotalExpenses(previousWindow);
+    const previousNet = previousIncome - previousExpenses;
+
+    const expenseChangePct = previousExpenses > 0
+      ? ((currentExpenses - previousExpenses) / previousExpenses) * 100
+      : 0;
+    const netChange = currentNet - previousNet;
+
+    const actions: string[] = [];
+    if (currentSavingsRate < 10) actions.push('Reduce discretionary spend this fortnight (dining, entertainment, shopping).');
+    if (expenseChangePct > 15) actions.push('Spending is accelerating — set temporary category caps for the next 14 days.');
+    if (currentNet < 0) actions.push('You are in a deficit this fortnight — pause non-essential purchases until net is positive.');
+    if (actions.length === 0) actions.push('Keep current habits and route surplus to savings goals.');
+
+    return {
+      currentIncome,
+      currentExpenses,
+      currentNet,
+      currentSavingsRate,
+      expenseChangePct,
+      netChange,
+      actions: actions.slice(0, 3),
+    };
+  }, [state.transactions]);
+
+  const whatIfProjection = useMemo(() => {
+    const trends = getMonthlyTrends(state.transactions, 3);
+    const monthlyIncomeBase = trends.length > 0
+      ? trends.reduce((sum, m) => sum + m.income, 0) / trends.length
+      : 0;
+    const monthlyExpenseBase = trends.length > 0
+      ? trends.reduce((sum, m) => sum + m.expenses, 0) / trends.length
+      : 0;
+
+    const monthlyIncome = monthlyIncomeBase * (1 + simIncomePct / 100);
+    const monthlyExpenses = monthlyExpenseBase * (1 + simExpensePct / 100);
+    const monthlyNet = monthlyIncome - monthlyExpenses;
+
+    let runningBalance = getBalance(state.transactions);
+    const rows: { month: string; income: number; expenses: number; net: number; balance: number }[] = [];
+    for (let i = 1; i <= simMonths; i++) {
+      const d = addMonths(new Date(), i);
+      runningBalance += monthlyNet;
+      rows.push({
+        month: format(d, 'MMM yyyy'),
+        income: monthlyIncome,
+        expenses: monthlyExpenses,
+        net: monthlyNet,
+        balance: runningBalance,
+      });
+    }
+
+    return { monthlyIncome, monthlyExpenses, monthlyNet, rows };
+  }, [state.transactions, simIncomePct, simExpensePct, simMonths]);
+
+  const merchantInsights = useMemo(() => {
+    const now = new Date();
+    const currentStart = subDays(now, 59);
+    const previousEnd = subDays(currentStart, 1);
+    const previousStart = subDays(previousEnd, 59);
+
+    const normalizeMerchant = (raw: string) => {
+      const v = raw.trim().toLowerCase();
+      if (!v) return 'Unknown';
+      return v.replace(/\s+/g, ' ').slice(0, 60);
+    };
+
+    const currentMap = new Map<string, number>();
+    const previousMap = new Map<string, number>();
+
+    for (const tx of state.transactions) {
+      if (tx.type !== 'expense' || tx.category === 'internal-transfer') continue;
+      const merchant = normalizeMerchant(tx.description);
+      const txDate = parseISO(tx.date);
+      if (isWithinInterval(txDate, { start: currentStart, end: now })) {
+        currentMap.set(merchant, (currentMap.get(merchant) || 0) + tx.amount);
+      } else if (isWithinInterval(txDate, { start: previousStart, end: previousEnd })) {
+        previousMap.set(merchant, (previousMap.get(merchant) || 0) + tx.amount);
+      }
+    }
+
+    return [...currentMap.entries()]
+      .map(([merchant, currentAmount]) => {
+        const prevAmount = previousMap.get(merchant) || 0;
+        const delta = currentAmount - prevAmount;
+        const deltaPct = prevAmount > 0 ? (delta / prevAmount) * 100 : 100;
+        return { merchant, currentAmount, prevAmount, delta, deltaPct };
+      })
+      .sort((a, b) => b.currentAmount - a.currentAmount)
+      .slice(0, 8);
+  }, [state.transactions]);
+
+  const driftAlerts = useMemo(() => {
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const selectedDate = new Date(y, m - 1, 1);
+    const months = [
+      format(subMonths(selectedDate, 2), 'yyyy-MM'),
+      format(subMonths(selectedDate, 1), 'yyyy-MM'),
+      format(selectedDate, 'yyyy-MM'),
+    ];
+    const expenseCategories = state.categories.filter(c => c.type === 'expense');
+
+    const alerts: {
+      categoryId: string;
+      categoryName: string;
+      values: number[];
+      growthPct: number;
+      percentUsed?: number;
+    }[] = [];
+
+    for (const cat of expenseCategories) {
+      const values = months.map(monthKey =>
+        getTransactionsForMonth(state.transactions, monthKey)
+          .filter(t => t.type === 'expense' && t.category === cat.id)
+          .reduce((sum, t) => sum + t.amount, 0)
+      );
+      const [v1, v2, v3] = values;
+      if (!(v3 > v2 && v2 > v1) || v3 <= 0) continue;
+      const growthPct = v1 > 0 ? ((v3 - v1) / v1) * 100 : 100;
+      const limit = getEffectiveBudgetLimit(state.budgetLimits, cat.id, selectedMonth, budgetMode);
+      const percentUsed = limit && limit > 0 ? (v3 / limit) * 100 : undefined;
+      if (growthPct >= 15 || (percentUsed !== undefined && percentUsed >= 70)) {
+        alerts.push({
+          categoryId: cat.id,
+          categoryName: cat.name,
+          values,
+          growthPct,
+          percentUsed,
+        });
+      }
+    }
+
+    return alerts.sort((a, b) => {
+      const aScore = (a.percentUsed ?? 0) + a.growthPct;
+      const bScore = (b.percentUsed ?? 0) + b.growthPct;
+      return bScore - aScore;
+    }).slice(0, 6);
+  }, [state.categories, state.transactions, state.budgetLimits, selectedMonth, budgetMode]);
 
   const upcomingBills = useMemo(
     () => getUpcomingBills(state.recurringTransactions ?? [], 7),
@@ -258,6 +425,128 @@ export default function Dashboard() {
         })}
       </div>
 
+      {/* Financial health score */}
+      <div className="bg-white dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/40 shadow-[0_1px_3px_rgba(0,0,0,0.02)] rounded-[20px] p-8 lg:p-10">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+          <div>
+            <p className="text-xs font-semibold tracking-wide uppercase text-slate-400 dark:text-slate-500">Financial Health Score</p>
+            <div className="flex items-end gap-3 mt-2">
+              <p
+                className={`text-4xl font-bold ${
+                  financialHealth.score >= 85 ? 'text-emerald-600 dark:text-emerald-400'
+                  : financialHealth.score >= 70 ? 'text-indigo-600 dark:text-indigo-400'
+                  : financialHealth.score >= 55 ? 'text-amber-600 dark:text-amber-400'
+                  : 'text-rose-600 dark:text-rose-400'
+                }`}
+                style={{ fontFamily: 'var(--font-display)' }}
+              >
+                {financialHealth.score}
+              </p>
+              <p className="text-sm text-slate-500 dark:text-slate-400 pb-1">/ 100 · {financialHealth.label}</p>
+            </div>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
+              Built from savings rate, budget adherence, debt trend, and cash buffer.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 min-w-[260px]">
+            <div className="rounded-2xl bg-slate-50/80 dark:bg-slate-900/20 p-4">
+              <p className="text-xs text-slate-400 dark:text-slate-500">Savings rate</p>
+              <p className="text-lg font-semibold text-slate-900 dark:text-white">{financialHealth.breakdown.savingsRateScore.toFixed(0)}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{financialHealth.savingsRate.toFixed(1)}%</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50/80 dark:bg-slate-900/20 p-4">
+              <p className="text-xs text-slate-400 dark:text-slate-500">Budget adherence</p>
+              <p className="text-lg font-semibold text-slate-900 dark:text-white">{financialHealth.breakdown.budgetAdherenceScore.toFixed(0)}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{financialHealth.budgetAdherence.toFixed(0)}%</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50/80 dark:bg-slate-900/20 p-4">
+              <p className="text-xs text-slate-400 dark:text-slate-500">Debt trend</p>
+              <p className="text-lg font-semibold text-slate-900 dark:text-white">{financialHealth.breakdown.debtTrendScore.toFixed(0)}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 capitalize">{financialHealth.debtTrend}</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50/80 dark:bg-slate-900/20 p-4">
+              <p className="text-xs text-slate-400 dark:text-slate-500">Cash buffer</p>
+              <p className="text-lg font-semibold text-slate-900 dark:text-white">{financialHealth.breakdown.cashBufferScore.toFixed(0)}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{financialHealth.cashBufferMonths.toFixed(1)} mo</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Fortnightly brief + merchant insights */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/40 shadow-[0_1px_3px_rgba(0,0,0,0.02)] rounded-[20px] p-8 lg:p-10">
+          <h3 className="text-[15px] font-semibold text-slate-900 dark:text-white mb-6">Fortnightly Money Brief</h3>
+          <div className="grid grid-cols-2 gap-3 mb-5">
+            <div className="rounded-2xl bg-slate-50/80 dark:bg-slate-900/20 p-4">
+              <p className="text-xs text-slate-400 dark:text-slate-500">Income (14d)</p>
+              <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(fortnightlyBrief.currentIncome)}</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50/80 dark:bg-slate-900/20 p-4">
+              <p className="text-xs text-slate-400 dark:text-slate-500">Expenses (14d)</p>
+              <p className="text-sm font-semibold text-rose-600 dark:text-rose-400">{formatCurrency(fortnightlyBrief.currentExpenses)}</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50/80 dark:bg-slate-900/20 p-4">
+              <p className="text-xs text-slate-400 dark:text-slate-500">Net</p>
+              <p className={`text-sm font-semibold ${fortnightlyBrief.currentNet >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>{formatCurrency(fortnightlyBrief.currentNet)}</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50/80 dark:bg-slate-900/20 p-4">
+              <p className="text-xs text-slate-400 dark:text-slate-500">Savings rate</p>
+              <p className="text-sm font-semibold text-slate-900 dark:text-white">{fortnightlyBrief.currentSavingsRate.toFixed(1)}%</p>
+            </div>
+          </div>
+          <div className="space-y-1.5 mb-4">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Expense trend vs previous 14d:
+              <span className={`ml-1 font-semibold ${fortnightlyBrief.expenseChangePct <= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                {fortnightlyBrief.expenseChangePct >= 0 ? '+' : ''}{fortnightlyBrief.expenseChangePct.toFixed(1)}%
+              </span>
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Net change vs previous 14d:
+              <span className={`ml-1 font-semibold ${fortnightlyBrief.netChange >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                {fortnightlyBrief.netChange >= 0 ? '+' : ''}{formatCurrency(fortnightlyBrief.netChange)}
+              </span>
+            </p>
+          </div>
+          <div className="rounded-2xl border border-indigo-100 dark:border-indigo-500/20 bg-indigo-50/50 dark:bg-indigo-500/5 p-4">
+            <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-400 mb-2">Recommended next actions</p>
+            <ul className="space-y-1.5">
+              {fortnightlyBrief.actions.map(action => (
+                <li key={action} className="text-xs text-slate-600 dark:text-slate-300">• {action}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/40 shadow-[0_1px_3px_rgba(0,0,0,0.02)] rounded-[20px] p-8 lg:p-10">
+          <h3 className="text-[15px] font-semibold text-slate-900 dark:text-white mb-6">Merchant Insights (Last 60 Days)</h3>
+          {merchantInsights.length === 0 ? (
+            <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-8">Not enough merchant data yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {merchantInsights.map(item => (
+                <div key={item.merchant} className="flex items-center gap-3 py-2.5 px-3 rounded-xl bg-slate-50/60 dark:bg-slate-900/20">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-medium text-slate-900 dark:text-white truncate">{item.merchant}</p>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                      Prev 60d: {formatCurrency(item.prevAmount)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[13px] font-semibold text-rose-600 dark:text-rose-400">{formatCurrency(item.currentAmount)}</p>
+                    <p className={`text-[11px] font-medium ${item.delta <= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                      {item.delta >= 0 ? '+' : ''}{item.deltaPct.toFixed(0)}%
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Budget vs Actuals */}
@@ -303,6 +592,118 @@ export default function Dashboard() {
               <Bar dataKey="projectedExpenses" name="Est. Expenses" fill="#fecdd3" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* What-if simulator + budget drift detector */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/40 shadow-[0_1px_3px_rgba(0,0,0,0.02)] rounded-[20px] p-8 lg:p-10">
+          <h3 className="text-[15px] font-semibold text-slate-900 dark:text-white mb-6">Forecast What-If Simulator</h3>
+          <div className="space-y-4">
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs text-slate-500 dark:text-slate-400">Income adjustment</label>
+                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{simIncomePct >= 0 ? '+' : ''}{simIncomePct}%</span>
+              </div>
+              <input type="range" min={-40} max={40} value={simIncomePct} onChange={e => setSimIncomePct(Number(e.target.value))} className="w-full" />
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs text-slate-500 dark:text-slate-400">Expense adjustment</label>
+                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{simExpensePct >= 0 ? '+' : ''}{simExpensePct}%</span>
+              </div>
+              <input type="range" min={-40} max={40} value={simExpensePct} onChange={e => setSimExpensePct(Number(e.target.value))} className="w-full" />
+            </div>
+            <div className="flex items-center justify-between">
+              <label className="text-xs text-slate-500 dark:text-slate-400">Projection horizon</label>
+              <select
+                value={simMonths}
+                onChange={e => setSimMonths(Number(e.target.value))}
+                className="text-xs font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5"
+              >
+                <option value={3}>3 months</option>
+                <option value={6}>6 months</option>
+                <option value={9}>9 months</option>
+                <option value={12}>12 months</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-5 grid grid-cols-3 gap-3">
+            <div className="rounded-xl bg-slate-50/70 dark:bg-slate-900/20 p-3">
+              <p className="text-[11px] text-slate-400 dark:text-slate-500">Est. monthly income</p>
+              <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(whatIfProjection.monthlyIncome)}</p>
+            </div>
+            <div className="rounded-xl bg-slate-50/70 dark:bg-slate-900/20 p-3">
+              <p className="text-[11px] text-slate-400 dark:text-slate-500">Est. monthly expenses</p>
+              <p className="text-xs font-semibold text-rose-600 dark:text-rose-400">{formatCurrency(whatIfProjection.monthlyExpenses)}</p>
+            </div>
+            <div className="rounded-xl bg-slate-50/70 dark:bg-slate-900/20 p-3">
+              <p className="text-[11px] text-slate-400 dark:text-slate-500">Est. monthly net</p>
+              <p className={`text-xs font-semibold ${whatIfProjection.monthlyNet >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                {formatCurrency(whatIfProjection.monthlyNet)}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-slate-100 dark:border-slate-700/40">
+                  <th className="text-left py-2 px-2 text-slate-500 dark:text-slate-400 font-medium">Month</th>
+                  <th className="text-right py-2 px-2 text-slate-500 dark:text-slate-400 font-medium">Net</th>
+                  <th className="text-right py-2 px-2 text-slate-500 dark:text-slate-400 font-medium">Projected Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {whatIfProjection.rows.map(row => (
+                  <tr key={row.month} className="border-b border-slate-50 dark:border-slate-700/20">
+                    <td className="py-2 px-2 text-slate-600 dark:text-slate-300">{row.month}</td>
+                    <td className={`py-2 px-2 text-right font-medium ${row.net >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                      {formatCurrency(row.net)}
+                    </td>
+                    <td className={`py-2 px-2 text-right font-semibold ${row.balance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                      {formatCurrency(row.balance)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/40 shadow-[0_1px_3px_rgba(0,0,0,0.02)] rounded-[20px] p-8 lg:p-10">
+          <h3 className="text-[15px] font-semibold text-slate-900 dark:text-white mb-6">Budget Drift Detector</h3>
+          {driftAlerts.length === 0 ? (
+            <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-8">
+              No strong upward drift detected in expense categories for the last 3 months.
+            </p>
+          ) : (
+            <div className="space-y-2.5">
+              {driftAlerts.map(alert => (
+                <div key={alert.categoryId} className="rounded-xl border border-amber-100 dark:border-amber-500/20 bg-amber-50/40 dark:bg-amber-500/5 p-3.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">{alert.categoryName}</p>
+                    <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">
+                      +{alert.growthPct.toFixed(0)}% vs 2 months ago
+                    </p>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    {format(subMonths(new Date(selectedMonth + '-01'), 2), 'MMM')}: {formatCurrency(alert.values[0])}
+                    {' · '}
+                    {format(subMonths(new Date(selectedMonth + '-01'), 1), 'MMM')}: {formatCurrency(alert.values[1])}
+                    {' · '}
+                    {format(new Date(selectedMonth + '-01'), 'MMM')}: {formatCurrency(alert.values[2])}
+                  </p>
+                  {alert.percentUsed !== undefined && (
+                    <p className="text-xs mt-1 text-slate-500 dark:text-slate-400">
+                      Current month budget usage: <span className="font-semibold">{alert.percentUsed.toFixed(0)}%</span>
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

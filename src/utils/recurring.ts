@@ -1,4 +1,4 @@
-import { addWeeks, addMonths, addQuarters, addYears, isWithinInterval, startOfDay, format, parseISO, eachDayOfInterval } from 'date-fns';
+import { addWeeks, addMonths, addQuarters, addYears, startOfDay, format, parseISO, eachDayOfInterval } from 'date-fns';
 import type { RecurringTransaction, RecurringFrequency, Transaction, TransactionType } from '../types';
 
 export function getNextDueDate(fromDate: Date, frequency: RecurringFrequency): Date {
