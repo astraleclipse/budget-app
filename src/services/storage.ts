@@ -4,6 +4,32 @@ import { format } from 'date-fns';
 
 const STORAGE_KEY = 'budget-app:state';
 
+function mergeWithDefaultCategories(categories: Category[]): Category[] {
+  const savedIds = new Set(categories.map(c => c.id));
+  return [
+    ...categories,
+    ...DEFAULT_CATEGORIES.filter(dc => !savedIds.has(dc.id)),
+  ];
+}
+
+function normalizeState(data: Partial<BudgetState>): BudgetState {
+  const defaults = getDefaultState();
+  const categories = Array.isArray(data.categories) ? data.categories : [];
+
+  return {
+    ...defaults,
+    ...data,
+    transactions: Array.isArray(data.transactions) ? data.transactions : [],
+    categories: mergeWithDefaultCategories(categories),
+    budgetLimits: Array.isArray(data.budgetLimits) ? data.budgetLimits : [],
+    analyses: Array.isArray(data.analyses) ? data.analyses : [],
+    recurringTransactions: Array.isArray(data.recurringTransactions) ? data.recurringTransactions : [],
+    savingsGoals: Array.isArray(data.savingsGoals) ? data.savingsGoals : [],
+    debtAccounts: Array.isArray(data.debtAccounts) ? data.debtAccounts : [],
+    settings: { ...defaults.settings, ...data.settings },
+  };
+}
+
 export function getDefaultState(): BudgetState {
   return {
     transactions: [],
@@ -11,6 +37,8 @@ export function getDefaultState(): BudgetState {
     budgetLimits: [],
     analyses: [],
     recurringTransactions: [],
+    savingsGoals: [],
+    debtAccounts: [],
     settings: {
       aiProvider: 'anthropic' as const,
       claudeApiKey: '',
@@ -30,23 +58,8 @@ export function loadState(): BudgetState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return getDefaultState();
-    const parsed = JSON.parse(raw);
-
-    // Merge categories: keep all saved categories + add any new defaults that are missing
-    const savedCategories: Category[] = parsed.categories || [];
-    const savedIds = new Set(savedCategories.map((c: Category) => c.id));
-    const mergedCategories = [
-      ...savedCategories,
-      ...DEFAULT_CATEGORIES.filter(dc => !savedIds.has(dc.id)),
-    ];
-
-    return {
-      ...getDefaultState(),
-      ...parsed,
-      categories: mergedCategories,
-      recurringTransactions: Array.isArray(parsed.recurringTransactions) ? parsed.recurringTransactions : [],
-      settings: { ...getDefaultState().settings, ...parsed.settings },
-    };
+    const parsed = JSON.parse(raw) as Partial<BudgetState>;
+    return normalizeState(parsed);
   } catch {
     return getDefaultState();
   }
@@ -76,14 +89,10 @@ export function exportData(state: BudgetState): void {
 export function importData(json: string): BudgetState | null {
   try {
     const parsed = JSON.parse(json);
-    const data = parsed.data || parsed;
+    const data = (parsed.data || parsed) as Partial<BudgetState>;
     if (!data.transactions || !Array.isArray(data.transactions)) return null;
     if (!data.categories || !Array.isArray(data.categories)) return null;
-    return {
-      ...getDefaultState(),
-      ...data,
-      settings: { ...getDefaultState().settings, ...data.settings },
-    };
+    return normalizeState(data);
   } catch {
     return null;
   }

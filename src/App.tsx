@@ -10,6 +10,9 @@ import AiAdvisorPanel from './components/ai-advisor/AiAdvisorPanel';
 import CsvImportPage from './components/import/CsvImportPage';
 import SettingsPage from './components/settings/SettingsPage';
 import RecurringPage from './components/recurring/RecurringPage';
+import GoalsPage from './components/goals/GoalsPage';
+import DebtPlannerPage from './components/debt/DebtPlannerPage';
+import CashflowCalendarPage from './components/cashflow/CashflowCalendarPage';
 
 const PAGE_TITLES: Record<string, string> = {
   dashboard: 'Dashboard',
@@ -19,6 +22,9 @@ const PAGE_TITLES: Record<string, string> = {
   import: 'Import CSV',
   settings: 'Settings',
   recurring: 'Bills & Recurring',
+  goals: 'Savings Goals',
+  debt: 'Debt Planner',
+  cashflow: 'Cashflow Calendar',
 };
 
 function AppContent() {
@@ -64,6 +70,9 @@ function AppContent() {
           {page === 'import' && <CsvImportPage />}
           {page === 'settings' && <SettingsPage />}
           {page === 'recurring' && <RecurringPage />}
+          {page === 'goals' && <GoalsPage />}
+          {page === 'debt' && <DebtPlannerPage />}
+          {page === 'cashflow' && <CashflowCalendarPage />}
         </main>
       </div>
     </div>

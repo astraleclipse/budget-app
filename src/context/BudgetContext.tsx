@@ -81,6 +81,47 @@ function budgetReducer(state: BudgetState, action: BudgetAction): BudgetState {
         ...state,
         recurringTransactions: (state.recurringTransactions || []).filter(r => r.id !== action.payload),
       };
+    case 'ADD_SAVINGS_GOAL':
+      return { ...state, savingsGoals: [...(state.savingsGoals || []), action.payload] };
+    case 'UPDATE_SAVINGS_GOAL':
+      return {
+        ...state,
+        savingsGoals: (state.savingsGoals || []).map(g =>
+          g.id === action.payload.id ? action.payload : g
+        ),
+      };
+    case 'DELETE_SAVINGS_GOAL':
+      return {
+        ...state,
+        savingsGoals: (state.savingsGoals || []).filter(g => g.id !== action.payload),
+      };
+    case 'ADD_GOAL_CONTRIBUTION':
+      return {
+        ...state,
+        savingsGoals: (state.savingsGoals || []).map(g =>
+          g.id === action.payload.goalId
+            ? {
+                ...g,
+                currentAmount: Math.max(0, g.currentAmount + action.payload.amount),
+                updatedAt: new Date().toISOString(),
+              }
+            : g
+        ),
+      };
+    case 'ADD_DEBT_ACCOUNT':
+      return { ...state, debtAccounts: [...(state.debtAccounts || []), action.payload] };
+    case 'UPDATE_DEBT_ACCOUNT':
+      return {
+        ...state,
+        debtAccounts: (state.debtAccounts || []).map(d =>
+          d.id === action.payload.id ? action.payload : d
+        ),
+      };
+    case 'DELETE_DEBT_ACCOUNT':
+      return {
+        ...state,
+        debtAccounts: (state.debtAccounts || []).filter(d => d.id !== action.payload),
+      };
     default:
       return state;
   }

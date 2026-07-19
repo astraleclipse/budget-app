@@ -17,6 +17,29 @@ export interface RecurringTransaction {
   updatedAt: string;
 }
 
+export interface SavingsGoal {
+  id: string;
+  name: string;
+  targetAmount: number;
+  currentAmount: number;
+  targetDate?: string; // 'yyyy-MM-dd'
+  monthlyContributionTarget: number;
+  linkedCategoryId?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DebtAccount {
+  id: string;
+  name: string;
+  balance: number;
+  apr: number; // annual percentage rate (e.g. 18.5)
+  minimumPayment: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Transaction {
   id: string;
   type: TransactionType;
@@ -73,6 +96,8 @@ export interface BudgetState {
   analyses: AiAnalysis[];
   settings: AppSettings;
   recurringTransactions: RecurringTransaction[];
+  savingsGoals: SavingsGoal[];
+  debtAccounts: DebtAccount[];
 }
 
 export type BudgetAction =
@@ -92,4 +117,11 @@ export type BudgetAction =
   | { type: 'RESET_ALL' }
   | { type: 'ADD_RECURRING'; payload: RecurringTransaction }
   | { type: 'UPDATE_RECURRING'; payload: RecurringTransaction }
-  | { type: 'DELETE_RECURRING'; payload: string };
+  | { type: 'DELETE_RECURRING'; payload: string }
+  | { type: 'ADD_SAVINGS_GOAL'; payload: SavingsGoal }
+  | { type: 'UPDATE_SAVINGS_GOAL'; payload: SavingsGoal }
+  | { type: 'DELETE_SAVINGS_GOAL'; payload: string }
+  | { type: 'ADD_GOAL_CONTRIBUTION'; payload: { goalId: string; amount: number } }
+  | { type: 'ADD_DEBT_ACCOUNT'; payload: DebtAccount }
+  | { type: 'UPDATE_DEBT_ACCOUNT'; payload: DebtAccount }
+  | { type: 'DELETE_DEBT_ACCOUNT'; payload: string };
