@@ -85,11 +85,13 @@ export function loadState(): BudgetState {
   }
 }
 
-export function saveState(state: BudgetState): void {
+export function saveState(state: BudgetState): boolean {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    return true;
   } catch (e) {
     console.error('Failed to save state:', e);
+    return false;
   }
 }
 

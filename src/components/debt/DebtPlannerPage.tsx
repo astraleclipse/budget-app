@@ -20,6 +20,7 @@ function DebtForm({ open, onClose, onSave, edit }: DebtFormProps) {
   const [apr, setApr] = useState('');
   const [minimumPayment, setMinimumPayment] = useState('');
   const [paymentDueDay, setPaymentDueDay] = useState('');
+  const [notes, setNotes] = useState('');
 
   useMemo(() => {
     if (!open) return;
@@ -28,6 +29,7 @@ function DebtForm({ open, onClose, onSave, edit }: DebtFormProps) {
     setApr(edit ? String(edit.apr) : '');
     setMinimumPayment(edit ? String(edit.minimumPayment) : '');
     setPaymentDueDay(edit?.paymentDueDay ? String(edit.paymentDueDay) : '');
+    setNotes(edit?.notes ?? '');
   }, [open, edit]);
 
   const inputCls = 'w-full px-5 py-4 rounded-2xl border border-slate-200 dark:border-slate-700/50 bg-slate-50/50 dark:bg-slate-900/30 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent';
@@ -53,6 +55,7 @@ function DebtForm({ open, onClose, onSave, edit }: DebtFormProps) {
       apr: parsedApr,
       minimumPayment: parsedMin,
       paymentDueDay: parsedDueDay,
+      notes: notes.trim() || undefined,
       createdAt: edit?.createdAt ?? now,
       updatedAt: now,
     });
@@ -83,6 +86,16 @@ function DebtForm({ open, onClose, onSave, edit }: DebtFormProps) {
         <div>
           <label className={labelCls}>Payment due day (optional)</label>
           <input className={inputCls} type="number" min="1" max="31" step="1" value={paymentDueDay} onChange={e => setPaymentDueDay(e.target.value)} placeholder="e.g. 15" />
+        </div>
+        <div>
+          <label className={labelCls}>Notes <span className="text-slate-400 dark:text-slate-500 font-normal">(optional)</span></label>
+          <textarea
+            className={`${inputCls} resize-none`}
+            rows={2}
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            placeholder="e.g. 0% promo ends Dec 2026"
+          />
         </div>
         <div className="flex gap-3 pt-2">
           <button type="button" onClick={onClose} className="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-700/60 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/60 font-medium text-sm transition-colors">

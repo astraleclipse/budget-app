@@ -1,4 +1,4 @@
-import { createContext, useContext, useReducer, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useReducer, useEffect, useState, type ReactNode } from 'react';
 import type { BudgetState, BudgetAction } from '../types';
 import { loadState, saveState, getDefaultState } from '../services/storage';
 import { applyTransactionRule, applyTransactionRules } from '../utils/transactionRules';
@@ -229,20 +229,33 @@ function budgetReducer(state: BudgetState, action: BudgetAction): BudgetState {
 interface BudgetContextValue {
   state: BudgetState;
   dispatch: React.Dispatch<BudgetAction>;
+  storageError: boolean;
 }
 
 const BudgetContext = createContext<BudgetContextValue | null>(null);
 
 export function BudgetProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(budgetReducer, null, loadState);
+  const [storageError, setStorageError] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => saveState(state), 300);
+    const timer = setTimeout(() => {
+      const ok = saveState(state);
+      setStorageError(!ok);
+    }, 300);
     return () => clearTimeout(timer);
   }, [state]);
 
   return (
-    <BudgetContext.Provider value={{ state, dispatch }}>
+    <BudgetContext.Provider value={{ state, dispatch, storageError }}>
+      {storageError && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-5 py-3 bg-rose-600 text-white text-sm font-medium rounded-2xl shadow-lg flex items-center gap-2">
+          <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Storage full — your latest changes could not be saved. Free up browser storage to continue.
+        </div>
+      )}
       {children}
     </BudgetContext.Provider>
   );

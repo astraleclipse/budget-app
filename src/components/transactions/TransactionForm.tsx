@@ -17,6 +17,7 @@ export default function TransactionForm({ open, onClose, onSave, categories, edi
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [notes, setNotes] = useState('');
 
   useEffect(() => {
     if (editTransaction) {
@@ -25,12 +26,14 @@ export default function TransactionForm({ open, onClose, onSave, categories, edi
       setCategory(editTransaction.category);
       setDescription(editTransaction.description);
       setDate(editTransaction.date);
+      setNotes(editTransaction.notes ?? '');
     } else {
       setType('expense');
       setAmount('');
       setCategory('');
       setDescription('');
       setDate(new Date().toISOString().split('T')[0]);
+      setNotes('');
     }
   }, [editTransaction, open]);
 
@@ -51,6 +54,7 @@ export default function TransactionForm({ open, onClose, onSave, categories, edi
       category,
       description: description.trim(),
       date,
+      notes: notes.trim() || undefined,
       createdAt: editTransaction?.createdAt || now,
       updatedAt: now,
     });
@@ -129,6 +133,17 @@ export default function TransactionForm({ open, onClose, onSave, categories, edi
             onChange={e => setDate(e.target.value)}
             required
             className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Notes <span className="text-slate-400 font-normal">(optional)</span></label>
+          <textarea
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            placeholder="Add a note…"
+            rows={2}
+            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
           />
         </div>
 
