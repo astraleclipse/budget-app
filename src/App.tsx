@@ -13,6 +13,8 @@ import RecurringPage from './components/recurring/RecurringPage';
 import GoalsPage from './components/goals/GoalsPage';
 import DebtPlannerPage from './components/debt/DebtPlannerPage';
 import CashflowCalendarPage from './components/cashflow/CashflowCalendarPage';
+import AlertsPage from './components/alerts/AlertsPage';
+import ActionSchedulerPage from './components/actions/ActionSchedulerPage';
 
 const PAGE_TITLES: Record<string, string> = {
   dashboard: 'Dashboard',
@@ -25,6 +27,8 @@ const PAGE_TITLES: Record<string, string> = {
   goals: 'Savings Goals',
   debt: 'Debt Planner',
   cashflow: 'Cashflow Calendar',
+  alerts: 'Alerts Inbox',
+  actions: 'Action Scheduler',
 };
 
 function AppContent() {
@@ -73,6 +77,8 @@ function AppContent() {
           {page === 'goals' && <GoalsPage />}
           {page === 'debt' && <DebtPlannerPage />}
           {page === 'cashflow' && <CashflowCalendarPage />}
+          {page === 'alerts' && <AlertsPage />}
+          {page === 'actions' && <ActionSchedulerPage />}
         </main>
       </div>
     </div>

@@ -4,6 +4,7 @@ import { useBudget } from '../../context/BudgetContext';
 import type { DebtAccount } from '../../types';
 import { formatCurrency } from '../../utils/formatters';
 import { calculateDebtPlan, type DebtPayoffStrategy } from '../../utils/debt';
+import { getMonthlyTrends } from '../../utils/calculations';
 import Modal from '../ui/Modal';
 
 interface DebtFormProps {
@@ -91,6 +92,8 @@ export default function DebtPlannerPage() {
   const [editing, setEditing] = useState<DebtAccount | null>(null);
   const [strategy, setStrategy] = useState<DebtPayoffStrategy>('avalanche');
   const [extraPayment, setExtraPayment] = useState(0);
+  const [aprShock, setAprShock] = useState(2);
+  const [incomeDropPct, setIncomeDropPct] = useState(10);
 
   const accounts = state.debtAccounts ?? [];
   const sectionCls = 'bg-white dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/40 rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.02)] p-8 lg:p-10';
@@ -104,6 +107,32 @@ export default function DebtPlannerPage() {
   const snowball = useMemo(() => calculateDebtPlan(accounts, 'snowball', extraPayment), [accounts, extraPayment]);
   const avalanche = useMemo(() => calculateDebtPlan(accounts, 'avalanche', extraPayment), [accounts, extraPayment]);
   const activePlan = strategy === 'snowball' ? snowball : avalanche;
+
+  const stressPlan = useMemo(() => {
+    const trends = getMonthlyTrends(state.transactions, 3);
+    const avgIncome = trends.length > 0
+      ? trends.reduce((sum, t) => sum + t.income, 0) / trends.length
+      : 0;
+    const avgExpenses = trends.length > 0
+      ? trends.reduce((sum, t) => sum + t.expenses, 0) / trends.length
+      : 0;
+    const baselineNet = avgIncome - avgExpenses;
+    const stressedIncome = avgIncome * (1 - incomeDropPct / 100);
+    const stressedNet = stressedIncome - avgExpenses;
+    const adjustedExtraPayment = Math.max(0, extraPayment + (stressedNet - baselineNet));
+
+    const stressedAccounts = accounts.map(a => ({
+      ...a,
+      apr: Math.max(0, a.apr + aprShock),
+    }));
+    const stressed = calculateDebtPlan(stressedAccounts, strategy, adjustedExtraPayment);
+    return {
+      adjustedExtraPayment,
+      plan: stressed,
+      monthsDelta: stressed.monthsToDebtFree - activePlan.monthsToDebtFree,
+      interestDelta: stressed.totalInterestPaid - activePlan.totalInterestPaid,
+    };
+  }, [state.transactions, incomeDropPct, extraPayment, accounts, aprShock, strategy, activePlan.monthsToDebtFree, activePlan.totalInterestPaid]);
 
   const saveAccount = (account: DebtAccount) => {
     if (editing) dispatch({ type: 'UPDATE_DEBT_ACCOUNT', payload: account });
@@ -224,6 +253,67 @@ export default function DebtPlannerPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <div className={sectionCls}>
+        <h2 className="text-[15px] font-semibold text-slate-900 dark:text-white mb-6">Debt Stress Test</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-5">
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs text-slate-500 dark:text-slate-400">Interest rate rise</label>
+                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">+{aprShock.toFixed(1)}%</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={8}
+                step={0.5}
+                value={aprShock}
+                onChange={e => setAprShock(Number(e.target.value))}
+                className="w-full"
+              />
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs text-slate-500 dark:text-slate-400">Income drop</label>
+                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">-{incomeDropPct}%</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={40}
+                step={5}
+                value={incomeDropPct}
+                onChange={e => setIncomeDropPct(Number(e.target.value))}
+                className="w-full"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-slate-50/70 dark:bg-slate-900/20 p-4">
+              <p className="text-xs text-slate-400 dark:text-slate-500">Stressed extra payment</p>
+              <p className="text-lg font-semibold text-slate-900 dark:text-white">{formatCurrency(stressPlan.adjustedExtraPayment)}</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50/70 dark:bg-slate-900/20 p-4">
+              <p className="text-xs text-slate-400 dark:text-slate-500">Debt-free ETA (stress)</p>
+              <p className="text-lg font-semibold text-slate-900 dark:text-white">{stressPlan.plan.monthsToDebtFree} months</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50/70 dark:bg-slate-900/20 p-4">
+              <p className="text-xs text-slate-400 dark:text-slate-500">Timeline impact</p>
+              <p className={`text-lg font-semibold ${stressPlan.monthsDelta <= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                {stressPlan.monthsDelta > 0 ? `+${stressPlan.monthsDelta}` : stressPlan.monthsDelta} months
+              </p>
+            </div>
+            <div className="rounded-2xl bg-slate-50/70 dark:bg-slate-900/20 p-4">
+              <p className="text-xs text-slate-400 dark:text-slate-500">Interest impact</p>
+              <p className={`text-lg font-semibold ${stressPlan.interestDelta <= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                {stressPlan.interestDelta >= 0 ? '+' : ''}{formatCurrency(stressPlan.interestDelta)}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 

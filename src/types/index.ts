@@ -40,6 +40,18 @@ export interface DebtAccount {
   updatedAt: string;
 }
 
+export interface ScheduledAction {
+  id: string;
+  title: string;
+  description?: string;
+  dueDate: string; // 'yyyy-MM-dd'
+  completed: boolean;
+  snoozedUntil?: string; // 'yyyy-MM-dd'
+  source?: 'manual' | 'alert' | 'ai';
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Transaction {
   id: string;
   type: TransactionType;
@@ -98,6 +110,9 @@ export interface BudgetState {
   recurringTransactions: RecurringTransaction[];
   savingsGoals: SavingsGoal[];
   debtAccounts: DebtAccount[];
+  scheduledActions: ScheduledAction[];
+  dismissedAlertIds: string[];
+  snoozedAlerts: Record<string, string>; // alertId -> snoozedUntil (yyyy-MM-dd)
 }
 
 export type BudgetAction =
@@ -124,4 +139,12 @@ export type BudgetAction =
   | { type: 'ADD_GOAL_CONTRIBUTION'; payload: { goalId: string; amount: number } }
   | { type: 'ADD_DEBT_ACCOUNT'; payload: DebtAccount }
   | { type: 'UPDATE_DEBT_ACCOUNT'; payload: DebtAccount }
-  | { type: 'DELETE_DEBT_ACCOUNT'; payload: string };
+  | { type: 'DELETE_DEBT_ACCOUNT'; payload: string }
+  | { type: 'ADD_SCHEDULED_ACTION'; payload: ScheduledAction }
+  | { type: 'UPDATE_SCHEDULED_ACTION'; payload: ScheduledAction }
+  | { type: 'DELETE_SCHEDULED_ACTION'; payload: string }
+  | { type: 'TOGGLE_SCHEDULED_ACTION'; payload: string }
+  | { type: 'SNOOZE_SCHEDULED_ACTION'; payload: { id: string; until: string } }
+  | { type: 'DISMISS_ALERT'; payload: string }
+  | { type: 'SNOOZE_ALERT'; payload: { id: string; until: string } }
+  | { type: 'RESTORE_ALL_ALERTS' };

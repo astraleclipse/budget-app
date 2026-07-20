@@ -122,6 +122,56 @@ function budgetReducer(state: BudgetState, action: BudgetAction): BudgetState {
         ...state,
         debtAccounts: (state.debtAccounts || []).filter(d => d.id !== action.payload),
       };
+    case 'ADD_SCHEDULED_ACTION':
+      return { ...state, scheduledActions: [...(state.scheduledActions || []), action.payload] };
+    case 'UPDATE_SCHEDULED_ACTION':
+      return {
+        ...state,
+        scheduledActions: (state.scheduledActions || []).map(a =>
+          a.id === action.payload.id ? action.payload : a
+        ),
+      };
+    case 'DELETE_SCHEDULED_ACTION':
+      return {
+        ...state,
+        scheduledActions: (state.scheduledActions || []).filter(a => a.id !== action.payload),
+      };
+    case 'TOGGLE_SCHEDULED_ACTION':
+      return {
+        ...state,
+        scheduledActions: (state.scheduledActions || []).map(a =>
+          a.id === action.payload
+            ? { ...a, completed: !a.completed, updatedAt: new Date().toISOString() }
+            : a
+        ),
+      };
+    case 'SNOOZE_SCHEDULED_ACTION':
+      return {
+        ...state,
+        scheduledActions: (state.scheduledActions || []).map(a =>
+          a.id === action.payload.id
+            ? { ...a, snoozedUntil: action.payload.until, updatedAt: new Date().toISOString() }
+            : a
+        ),
+      };
+    case 'DISMISS_ALERT':
+      return {
+        ...state,
+        dismissedAlertIds: state.dismissedAlertIds.includes(action.payload)
+          ? state.dismissedAlertIds
+          : [...state.dismissedAlertIds, action.payload],
+      };
+    case 'SNOOZE_ALERT':
+      return {
+        ...state,
+        snoozedAlerts: { ...state.snoozedAlerts, [action.payload.id]: action.payload.until },
+      };
+    case 'RESTORE_ALL_ALERTS':
+      return {
+        ...state,
+        dismissedAlertIds: [],
+        snoozedAlerts: {},
+      };
     default:
       return state;
   }
