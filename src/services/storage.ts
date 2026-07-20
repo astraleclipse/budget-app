@@ -79,17 +79,25 @@ export function saveState(state: BudgetState): void {
   }
 }
 
-export function exportData(state: BudgetState): void {
-  const blob = new Blob(
-    [JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), data: state }, null, 2)],
-    { type: 'application/json' }
-  );
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `budget-backup-${format(new Date(), 'yyyy-MM-dd')}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
+export function exportData(state: BudgetState): boolean {
+  let url: string | null = null;
+  try {
+    const blob = new Blob(
+      [JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), data: state }, null, 2)],
+      { type: 'application/json' }
+    );
+    url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `budget-backup-${format(new Date(), 'yyyy-MM-dd')}.json`;
+    a.click();
+    return true;
+  } catch (e) {
+    console.error('Failed to export data:', e);
+    return false;
+  } finally {
+    if (url) URL.revokeObjectURL(url);
+  }
 }
 
 export function importData(json: string): BudgetState | null {

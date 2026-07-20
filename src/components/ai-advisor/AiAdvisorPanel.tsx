@@ -3,7 +3,8 @@ import { v4 as uuidv4 } from 'uuid';
 import Markdown from 'react-markdown';
 import { useBudget } from '../../context/BudgetContext';
 import { getCurrentMonth, formatMonth } from '../../utils/formatters';
-import { callAiApi, hasValidAiConfig } from '../../services/ai';
+import { callAiApi, hasValidAiConfig, getConfiguredProviders } from '../../services/ai';
+import type { AiProvider } from '../../services/ai';
 import { buildAnalysisPrompt } from '../../services/claude';
 
 export default function AiAdvisorPanel() {
@@ -15,6 +16,9 @@ export default function AiAdvisorPanel() {
 
   const hasApiKey = hasValidAiConfig(state.settings);
   const hasTransactions = state.transactions.length >= 3;
+  const configuredProviders = getConfiguredProviders(state.settings);
+  const [selectedProvider, setSelectedProvider] = useState<AiProvider | undefined>(undefined);
+  const effectiveProvider = selectedProvider ?? (state.settings.aiProvider as AiProvider | undefined);
 
   const handleAnalyze = async () => {
     if (!hasApiKey || !hasTransactions) return;
@@ -25,7 +29,7 @@ export default function AiAdvisorPanel() {
     try {
       const budgetMode = state.settings.budgetMode || 'monthly';
       const prompt = buildAnalysisPrompt(state.transactions, state.categories, state.budgetLimits, month, budgetMode);
-      const response = await callAiApi(state.settings, prompt);
+      const response = await callAiApi(state.settings, prompt, effectiveProvider);
       setCurrentResult(response);
       dispatch({
         type: 'ADD_ANALYSIS',
@@ -91,6 +95,24 @@ export default function AiAdvisorPanel() {
             <option key={m} value={m}>{formatMonth(m)}</option>
           ))}
         </select>
+
+        {configuredProviders.length > 1 && (
+          <div className="flex rounded-2xl border border-slate-200 dark:border-slate-700/50 bg-white dark:bg-slate-800/40 overflow-hidden">
+            {configuredProviders.map(p => (
+              <button
+                key={p.id}
+                onClick={() => setSelectedProvider(p.id)}
+                className={`px-4 py-3.5 text-sm font-medium transition-colors ${
+                  effectiveProvider === p.id
+                    ? 'bg-indigo-600 text-white'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/40'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         <button
           onClick={handleAnalyze}
