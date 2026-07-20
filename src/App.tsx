@@ -15,6 +15,9 @@ import DebtPlannerPage from './components/debt/DebtPlannerPage';
 import CashflowCalendarPage from './components/cashflow/CashflowCalendarPage';
 import AlertsPage from './components/alerts/AlertsPage';
 import ActionSchedulerPage from './components/actions/ActionSchedulerPage';
+import NetWorthPage from './components/net-worth/NetWorthPage';
+import IncomeForecastPage from './components/income/IncomeForecastPage';
+import TransactionRulesPage from './components/rules/TransactionRulesPage';
 
 const PAGE_TITLES: Record<string, string> = {
   dashboard: 'Dashboard',
@@ -27,6 +30,9 @@ const PAGE_TITLES: Record<string, string> = {
   goals: 'Savings Goals',
   debt: 'Debt Planner',
   cashflow: 'Cashflow Calendar',
+  networth: 'Net Worth',
+  income: 'Income Forecast',
+  rules: 'Transaction Rules',
   alerts: 'Alerts Inbox',
   actions: 'Action Scheduler',
 };
@@ -77,6 +83,9 @@ function AppContent() {
           {page === 'goals' && <GoalsPage />}
           {page === 'debt' && <DebtPlannerPage />}
           {page === 'cashflow' && <CashflowCalendarPage />}
+          {page === 'networth' && <NetWorthPage />}
+          {page === 'income' && <IncomeForecastPage />}
+          {page === 'rules' && <TransactionRulesPage />}
           {page === 'alerts' && <AlertsPage />}
           {page === 'actions' && <ActionSchedulerPage />}
         </main>

@@ -1,4 +1,6 @@
 export type TransactionType = 'income' | 'expense' | 'transfer';
+export type AssetAccountType = 'cash' | 'investment' | 'property' | 'vehicle' | 'other';
+export type TransactionRuleMatchMode = 'contains' | 'startsWith' | 'equals';
 
 export type RecurringFrequency = 'weekly' | 'fortnightly' | 'monthly' | 'quarterly' | 'yearly';
 
@@ -36,6 +38,44 @@ export interface DebtAccount {
   balance: number;
   apr: number; // annual percentage rate (e.g. 18.5)
   minimumPayment: number;
+  paymentDueDay?: number; // 1-31
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AssetAccount {
+  id: string;
+  name: string;
+  type: AssetAccountType;
+  value: number;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TransactionRule {
+  id: string;
+  name: string;
+  matchText: string;
+  matchMode: TransactionRuleMatchMode;
+  categoryId: string;
+  type: TransactionType;
+  renameTo?: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BudgetTemplateLine {
+  categoryId: string;
+  monthlyLimit: number;
+}
+
+export interface BudgetTemplate {
+  id: string;
+  name: string;
+  budgetMode: 'monthly' | 'yearly';
+  lines: BudgetTemplateLine[];
   createdAt: string;
   updatedAt: string;
 }
@@ -110,6 +150,9 @@ export interface BudgetState {
   recurringTransactions: RecurringTransaction[];
   savingsGoals: SavingsGoal[];
   debtAccounts: DebtAccount[];
+  assetAccounts: AssetAccount[];
+  transactionRules: TransactionRule[];
+  budgetTemplates: BudgetTemplate[];
   scheduledActions: ScheduledAction[];
   dismissedAlertIds: string[];
   snoozedAlerts: Record<string, string>; // alertId -> snoozedUntil (yyyy-MM-dd)
@@ -140,6 +183,15 @@ export type BudgetAction =
   | { type: 'ADD_DEBT_ACCOUNT'; payload: DebtAccount }
   | { type: 'UPDATE_DEBT_ACCOUNT'; payload: DebtAccount }
   | { type: 'DELETE_DEBT_ACCOUNT'; payload: string }
+  | { type: 'ADD_ASSET_ACCOUNT'; payload: AssetAccount }
+  | { type: 'UPDATE_ASSET_ACCOUNT'; payload: AssetAccount }
+  | { type: 'DELETE_ASSET_ACCOUNT'; payload: string }
+  | { type: 'ADD_TRANSACTION_RULE'; payload: TransactionRule }
+  | { type: 'UPDATE_TRANSACTION_RULE'; payload: TransactionRule }
+  | { type: 'DELETE_TRANSACTION_RULE'; payload: string }
+  | { type: 'ADD_BUDGET_TEMPLATE'; payload: BudgetTemplate }
+  | { type: 'UPDATE_BUDGET_TEMPLATE'; payload: BudgetTemplate }
+  | { type: 'DELETE_BUDGET_TEMPLATE'; payload: string }
   | { type: 'ADD_SCHEDULED_ACTION'; payload: ScheduledAction }
   | { type: 'UPDATE_SCHEDULED_ACTION'; payload: ScheduledAction }
   | { type: 'DELETE_SCHEDULED_ACTION'; payload: string }

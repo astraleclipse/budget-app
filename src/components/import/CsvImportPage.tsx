@@ -5,6 +5,7 @@ import { processImportedCsv, type StagedTransaction } from '../../services/csvPa
 import { learnFromTransactions } from '../../services/learnedRules';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import type { Transaction, TransactionType } from '../../types';
+import { applyTransactionRules } from '../../utils/transactionRules';
 
 const STAGED_STORAGE_KEY = 'budget-app:csv-staged';
 const STAGED_FILENAME_KEY = 'budget-app:csv-filename';
@@ -61,7 +62,31 @@ export default function CsvImportPage() {
     const reader = new FileReader();
     reader.onload = () => {
       const result = processImportedCsv(reader.result as string, state.categories);
-      setStaged(result);
+      const now = new Date().toISOString();
+      const ruledTransactions = applyTransactionRules(
+        result.map(row => ({
+          id: row.id,
+          type: row.type,
+          amount: row.amount,
+          category: row.category,
+          description: row.description,
+          date: row.date,
+          createdAt: now,
+          updatedAt: now,
+        })),
+        state.transactionRules ?? []
+      );
+      setStaged(result.map((row, index) => {
+        const ruled = ruledTransactions[index];
+        const wasChanged = ruled.type !== row.type || ruled.category !== row.category || ruled.description !== row.description;
+        return {
+          ...row,
+          type: ruled.type,
+          category: ruled.category,
+          description: ruled.description,
+          confidence: wasChanged ? 'high' as const : row.confidence,
+        };
+      }));
     };
     reader.readAsText(file);
     e.target.value = '';

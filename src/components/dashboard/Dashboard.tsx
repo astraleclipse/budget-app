@@ -3,6 +3,8 @@ import { useBudget } from '../../context/BudgetContext';
 import { getCurrentMonth, formatCurrency, formatMonth } from '../../utils/formatters';
 import { getTransactionsForMonth, getTotalIncome, getTotalExpenses, getBalance, getCategoryTotals, getMonthlyTrends, getEffectiveBudgetLimit, getTotalExpectedIncome, getFinancialHealthScore } from '../../utils/calculations';
 import { getUpcomingBills, frequencyLabel } from '../../utils/recurring';
+import { buildSystemAlerts } from '../../utils/alerts';
+import { getNetWorth, getTotalAssets, getTotalDebtBalance } from '../../utils/netWorth';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, Tooltip, ResponsiveContainer } from 'recharts';
 import { format, subMonths, addMonths, subDays, parseISO, isWithinInterval } from 'date-fns';
 
@@ -169,6 +171,12 @@ export default function Dashboard() {
 
   const recentTx = useMemo(() => [...monthTx].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8), [monthTx]);
   const catMap = new Map(state.categories.map(c => [c.id, c]));
+  const dashboardAlerts = useMemo(() => buildSystemAlerts(state), [state]);
+  const anomalyAlerts = dashboardAlerts.filter(alert => alert.source === 'anomaly').slice(0, 2);
+  const debtReminderAlerts = dashboardAlerts.filter(alert => alert.source === 'debt' && alert.id.startsWith('debt-payment-due')).slice(0, 2);
+  const assetTotal = getTotalAssets(state.assetAccounts ?? []);
+  const debtBalanceTotal = getTotalDebtBalance(state.debtAccounts ?? []);
+  const netWorth = getNetWorth(state.assetAccounts ?? [], state.debtAccounts ?? []);
 
   const fortnightlyBrief = useMemo(() => {
     const now = new Date();
@@ -447,6 +455,68 @@ export default function Dashboard() {
             </div>
           );
         })}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="bg-white dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/40 shadow-[0_1px_3px_rgba(0,0,0,0.02)] rounded-[20px] p-8">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-xs font-semibold tracking-wide uppercase text-slate-400 dark:text-slate-500">Net Worth Snapshot</p>
+              <p className={`text-3xl font-bold mt-2 ${netWorth >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-rose-600 dark:text-rose-400'}`} style={{ fontFamily: 'var(--font-display)' }}>
+                {formatCurrency(netWorth)}
+              </p>
+            </div>
+            <a href="#networth" className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">Open tracker</a>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-slate-50/80 dark:bg-slate-900/20 p-4">
+              <p className="text-xs text-slate-400 dark:text-slate-500">Assets</p>
+              <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(assetTotal)}</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50/80 dark:bg-slate-900/20 p-4">
+              <p className="text-xs text-slate-400 dark:text-slate-500">Debt</p>
+              <p className="text-sm font-semibold text-rose-600 dark:text-rose-400">{formatCurrency(debtBalanceTotal)}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/40 shadow-[0_1px_3px_rgba(0,0,0,0.02)] rounded-[20px] p-8">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-[15px] font-semibold text-slate-900 dark:text-white">Anomaly Detection</h3>
+            <a href="#alerts" className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">View all alerts</a>
+          </div>
+          {anomalyAlerts.length === 0 ? (
+            <p className="text-sm text-slate-400 dark:text-slate-500">No unusual charges or duplicate-spend patterns detected right now.</p>
+          ) : (
+            <div className="space-y-3">
+              {anomalyAlerts.map(alert => (
+                <div key={alert.id} className="rounded-2xl bg-amber-50/60 dark:bg-amber-500/8 border border-amber-200/60 dark:border-amber-500/20 p-4">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white">{alert.title}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{alert.message}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/40 shadow-[0_1px_3px_rgba(0,0,0,0.02)] rounded-[20px] p-8">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-[15px] font-semibold text-slate-900 dark:text-white">Debt Payment Reminders</h3>
+            <a href="#debt" className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">Manage debts</a>
+          </div>
+          {debtReminderAlerts.length === 0 ? (
+            <p className="text-sm text-slate-400 dark:text-slate-500">No debt payments due in the next few days.</p>
+          ) : (
+            <div className="space-y-3">
+              {debtReminderAlerts.map(alert => (
+                <div key={alert.id} className={`rounded-2xl p-4 border ${alert.severity === 'critical' ? 'bg-rose-50/60 dark:bg-rose-500/8 border-rose-200/60 dark:border-rose-500/20' : 'bg-amber-50/60 dark:bg-amber-500/8 border-amber-200/60 dark:border-amber-500/20'}`}>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white">{alert.title}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{alert.message}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Financial health score */}
