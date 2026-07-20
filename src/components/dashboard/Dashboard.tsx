@@ -213,13 +213,34 @@ export default function Dashboard() {
   }, [state.transactions]);
 
   const whatIfProjection = useMemo(() => {
-    const trends = getMonthlyTrends(state.transactions, 3);
-    const monthlyIncomeBase = trends.length > 0
-      ? trends.reduce((sum, m) => sum + m.income, 0) / trends.length
-      : 0;
-    const monthlyExpenseBase = trends.length > 0
-      ? trends.reduce((sum, m) => sum + m.expenses, 0) / trends.length
-      : 0;
+    // Use the selected month's actual figures as the base.
+    // Fall back to trailing 3-month average if the selected month has no data.
+    const selectedMonthTx = getTransactionsForMonth(state.transactions, selectedMonth);
+    const selectedIncome = getTotalIncome(selectedMonthTx);
+    const selectedExpenses = getTotalExpenses(selectedMonthTx);
+
+    let monthlyIncomeBase: number;
+    let monthlyExpenseBase: number;
+
+    if (selectedIncome > 0 || selectedExpenses > 0) {
+      monthlyIncomeBase = selectedIncome;
+      monthlyExpenseBase = selectedExpenses;
+    } else {
+      // No data for selected month — average last 3 months of available data
+      const allMonths = [...new Set(state.transactions.map(t => t.date.substring(0, 7)))].sort().reverse();
+      const recentMonths = allMonths.slice(0, 3);
+      if (recentMonths.length > 0) {
+        const totals = recentMonths.map(m => {
+          const tx = getTransactionsForMonth(state.transactions, m);
+          return { income: getTotalIncome(tx), expenses: getTotalExpenses(tx) };
+        });
+        monthlyIncomeBase = totals.reduce((s, m) => s + m.income, 0) / totals.length;
+        monthlyExpenseBase = totals.reduce((s, m) => s + m.expenses, 0) / totals.length;
+      } else {
+        monthlyIncomeBase = 0;
+        monthlyExpenseBase = 0;
+      }
+    }
 
     const monthlyIncome = monthlyIncomeBase * (1 + simIncomePct / 100);
     const monthlyExpenses = monthlyExpenseBase * (1 + simExpensePct / 100);
@@ -240,7 +261,7 @@ export default function Dashboard() {
     }
 
     return { monthlyIncome, monthlyExpenses, monthlyNet, rows };
-  }, [state.transactions, simIncomePct, simExpensePct, simMonths]);
+  }, [state.transactions, selectedMonth, simIncomePct, simExpensePct, simMonths]);
 
   const merchantInsights = useMemo(() => {
     const now = new Date();
@@ -598,7 +619,21 @@ export default function Dashboard() {
       {/* What-if simulator + budget drift detector */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/40 shadow-[0_1px_3px_rgba(0,0,0,0.02)] rounded-[20px] p-8 lg:p-10">
-          <h3 className="text-[15px] font-semibold text-slate-900 dark:text-white mb-6">Forecast What-If Simulator</h3>
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-[15px] font-semibold text-slate-900 dark:text-white">Forecast What-If Simulator</h3>
+            {(simIncomePct !== 0 || simExpensePct !== 0) && (
+              <button
+                onClick={() => { setSimIncomePct(0); setSimExpensePct(0); }}
+                className="flex items-center gap-1 text-xs font-medium text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                title="Reset sliders to zero"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Reset
+              </button>
+            )}
+          </div>
           <div className="space-y-4">
             <div>
               <div className="flex items-center justify-between mb-1.5">
