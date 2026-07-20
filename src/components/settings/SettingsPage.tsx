@@ -20,6 +20,7 @@ export default function SettingsPage() {
   const [newCatType, setNewCatType] = useState<TransactionType>('expense');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importMsg, setImportMsg] = useState<string | null>(null);
+  const [exportMsg, setExportMsg] = useState<string | null>(null);
   const [learnedRules, setLearnedRules] = useState<LearnedRule[]>([]);
   const [showAllRules, setShowAllRules] = useState(false);
 
@@ -116,6 +117,12 @@ export default function SettingsPage() {
     };
     reader.readAsText(file);
     e.target.value = '';
+  };
+
+  const handleExport = () => {
+    const ok = exportData(state);
+    setExportMsg(ok ? 'Data exported successfully!' : 'Export failed. Please try again.');
+    setTimeout(() => setExportMsg(null), 3000);
   };
 
   const sectionClasses = "bg-white dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/40 rounded-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.02)] p-8 lg:p-10";
@@ -515,7 +522,7 @@ export default function SettingsPage() {
         </div>
         <div className="flex gap-4">
           <button
-            onClick={() => exportData(state)}
+            onClick={handleExport}
             className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-sm font-semibold transition-colors shadow-sm shadow-emerald-500/20"
           >
             Export JSON
@@ -531,6 +538,11 @@ export default function SettingsPage() {
         {importMsg && (
           <p className={`text-sm mt-3 ${importMsg.includes('success') ? 'text-emerald-600' : 'text-rose-600'}`}>
             {importMsg}
+          </p>
+        )}
+        {exportMsg && (
+          <p className={`text-sm mt-3 ${exportMsg.includes('success') ? 'text-emerald-600' : 'text-rose-600'}`}>
+            {exportMsg}
           </p>
         )}
       </section>

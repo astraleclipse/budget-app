@@ -1,8 +1,16 @@
-import type { BudgetState, Category } from '../types';
+import type { BudgetState, BudgetLimit, Category } from '../types';
 import { DEFAULT_CATEGORIES } from '../constants/categories';
 import { format } from 'date-fns';
 
 const STORAGE_KEY = 'budget-app:state';
+
+function deduplicateBudgetLimits(limits: BudgetLimit[]): BudgetLimit[] {
+  const seen = new Map<string, BudgetLimit>();
+  for (const bl of limits) {
+    seen.set(`${bl.categoryId}::${bl.month}`, bl);
+  }
+  return [...seen.values()];
+}
 
 function mergeWithDefaultCategories(categories: Category[]): Category[] {
   const savedIds = new Set(categories.map(c => c.id));
@@ -21,7 +29,7 @@ function normalizeState(data: Partial<BudgetState>): BudgetState {
     ...data,
     transactions: Array.isArray(data.transactions) ? data.transactions : [],
     categories: mergeWithDefaultCategories(categories),
-    budgetLimits: Array.isArray(data.budgetLimits) ? data.budgetLimits : [],
+    budgetLimits: Array.isArray(data.budgetLimits) ? deduplicateBudgetLimits(data.budgetLimits) : [],
     analyses: Array.isArray(data.analyses) ? data.analyses : [],
     recurringTransactions: Array.isArray(data.recurringTransactions) ? data.recurringTransactions : [],
     savingsGoals: Array.isArray(data.savingsGoals) ? data.savingsGoals : [],
@@ -79,17 +87,25 @@ export function saveState(state: BudgetState): void {
   }
 }
 
-export function exportData(state: BudgetState): void {
-  const blob = new Blob(
-    [JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), data: state }, null, 2)],
-    { type: 'application/json' }
-  );
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `budget-backup-${format(new Date(), 'yyyy-MM-dd')}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
+export function exportData(state: BudgetState): boolean {
+  let url: string | null = null;
+  try {
+    const blob = new Blob(
+      [JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), data: state }, null, 2)],
+      { type: 'application/json' }
+    );
+    url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `budget-backup-${format(new Date(), 'yyyy-MM-dd')}.json`;
+    a.click();
+    return true;
+  } catch (e) {
+    console.error('Failed to export data:', e);
+    return false;
+  } finally {
+    if (url) URL.revokeObjectURL(url);
+  }
 }
 
 export function importData(json: string): BudgetState | null {

@@ -62,8 +62,23 @@ async function callOpenAiCompatibleApi(
   return data.choices[0].message.content;
 }
 
-export async function callAiApi(settings: AppSettings, userMessage: string): Promise<string> {
-  const provider = settings.aiProvider || 'anthropic';
+export type AiProvider = 'anthropic' | 'openai' | 'local';
+
+export interface ConfiguredProvider {
+  id: AiProvider;
+  label: string;
+}
+
+export function getConfiguredProviders(settings: AppSettings): ConfiguredProvider[] {
+  const providers: ConfiguredProvider[] = [];
+  if (settings.claudeApiKey) providers.push({ id: 'anthropic', label: 'Anthropic (Claude)' });
+  if (settings.openAiApiKey) providers.push({ id: 'openai', label: 'OpenAI (GPT)' });
+  if (settings.localAiBaseUrl && settings.localAiModel) providers.push({ id: 'local', label: 'Local LLM' });
+  return providers;
+}
+
+export async function callAiApi(settings: AppSettings, userMessage: string, providerOverride?: AiProvider): Promise<string> {
+  const provider = providerOverride ?? settings.aiProvider ?? 'anthropic';
 
   if (provider === 'anthropic') {
     return callAnthropicApi(
