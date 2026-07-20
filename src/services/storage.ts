@@ -26,6 +26,9 @@ function normalizeState(data: Partial<BudgetState>): BudgetState {
     recurringTransactions: Array.isArray(data.recurringTransactions) ? data.recurringTransactions : [],
     savingsGoals: Array.isArray(data.savingsGoals) ? data.savingsGoals : [],
     debtAccounts: Array.isArray(data.debtAccounts) ? data.debtAccounts : [],
+    scheduledActions: Array.isArray(data.scheduledActions) ? data.scheduledActions : [],
+    dismissedAlertIds: Array.isArray(data.dismissedAlertIds) ? data.dismissedAlertIds : [],
+    snoozedAlerts: data.snoozedAlerts && typeof data.snoozedAlerts === 'object' ? data.snoozedAlerts : {},
     settings: { ...defaults.settings, ...data.settings },
   };
 }
@@ -39,6 +42,9 @@ export function getDefaultState(): BudgetState {
     recurringTransactions: [],
     savingsGoals: [],
     debtAccounts: [],
+    scheduledActions: [],
+    dismissedAlertIds: [],
+    snoozedAlerts: {},
     settings: {
       aiProvider: 'anthropic' as const,
       claudeApiKey: '',

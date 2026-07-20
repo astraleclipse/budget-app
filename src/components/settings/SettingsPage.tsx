@@ -56,6 +56,12 @@ export default function SettingsPage() {
     setTimeout(() => setSaved(false), 2000);
   };
 
+  const handleProviderChange = (provider: AiProvider) => {
+    dispatch({ type: 'UPDATE_SETTINGS', payload: { aiProvider: provider } });
+    setTestResult(null);
+    setTesting(false);
+  };
+
   const handleTestApiKey = async () => {
     setTesting(true);
     setTestResult(null);
@@ -138,7 +144,7 @@ export default function SettingsPage() {
           {(['anthropic', 'openai', 'local'] as AiProvider[]).map(p => (
             <button
               key={p}
-              onClick={() => dispatch({ type: 'UPDATE_SETTINGS', payload: { aiProvider: p } })}
+              onClick={() => handleProviderChange(p)}
               className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all ${
                 (state.settings.aiProvider || 'anthropic') === p
                   ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm'
