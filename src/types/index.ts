@@ -39,6 +39,7 @@ export interface DebtAccount {
   apr: number; // annual percentage rate (e.g. 18.5)
   minimumPayment: number;
   paymentDueDay?: number; // 1-31
+  notes?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -99,6 +100,7 @@ export interface Transaction {
   category: string;
   description: string;
   date: string;
+  notes?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -124,6 +126,7 @@ export interface AiAnalysis {
   timestamp: string;
   month: string;
   response: string;
+  provider?: AiProvider;
 }
 
 export type AiProvider = 'anthropic' | 'openai' | 'local';

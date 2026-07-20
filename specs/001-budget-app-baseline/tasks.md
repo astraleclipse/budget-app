@@ -72,7 +72,7 @@ All phases complete. Run `/speckit.converge` to identify any remaining gaps.
 - Findings: 1 partial (CRITICAL), 1 partial (MEDIUM), 2 missing (LOW)
 - Total: 4 findings
 
-- [ ] T031 Surface localStorage write errors to the user — update `saveState()` in `src/services/storage.ts` to throw or return a boolean, and `saveLearnedRules()` in `src/services/learnedRules.ts` likewise; add a visible toast or banner in `src/context/BudgetContext.tsx` (or a global error boundary) when persistence fails per Constitution I (partial)
-- [ ] T032 Add `provider: AiProvider` field to `AiAnalysis` interface in `src/types/index.ts`; update `AiAdvisorPanel.tsx` `ADD_ANALYSIS` dispatch to include `provider: effectiveProvider`; show provider label in the Previous Analyses list timestamp line per spec entity `AiAnalysis` and US4/AC3 (partial)
-- [ ] T033 Add optional `notes?: string` field to `Transaction` interface in `src/types/index.ts`; add a notes textarea to the add/edit transaction modal per spec entity `Transaction` (missing)
-- [ ] T034 Add optional `notes?: string` field to `DebtAccount` interface in `src/types/index.ts`; add a notes textarea to the add/edit debt modal per spec entity `DebtAccount` (missing)
+- [x] T031 Surface localStorage write errors to the user — update `saveState()` in `src/services/storage.ts` to throw or return a boolean, and `saveLearnedRules()` in `src/services/learnedRules.ts` likewise; add a visible toast or banner in `src/context/BudgetContext.tsx` (or a global error boundary) when persistence fails per Constitution I (partial)
+- [x] T032 Add `provider: AiProvider` field to `AiAnalysis` interface in `src/types/index.ts`; update `AiAdvisorPanel.tsx` `ADD_ANALYSIS` dispatch to include `provider: effectiveProvider`; show provider label in the Previous Analyses list timestamp line per spec entity `AiAnalysis` and US4/AC3 (partial)
+- [x] T033 Add optional `notes?: string` field to `Transaction` interface in `src/types/index.ts`; add a notes textarea to the add/edit transaction modal per spec entity `Transaction` (missing)
+- [x] T034 Add optional `notes?: string` field to `DebtAccount` interface in `src/types/index.ts`; add a notes textarea to the add/edit debt modal per spec entity `DebtAccount` (missing)

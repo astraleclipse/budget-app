@@ -25,12 +25,14 @@ export function loadLearnedRules(): Map<string, LearnedRule> {
   }
 }
 
-export function saveLearnedRules(rules: Map<string, LearnedRule>): void {
+export function saveLearnedRules(rules: Map<string, LearnedRule>): boolean {
   try {
     const arr = Array.from(rules.values());
     localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+    return true;
   } catch (e) {
     console.error('Failed to save learned rules:', e);
+    return false;
   }
 }
 

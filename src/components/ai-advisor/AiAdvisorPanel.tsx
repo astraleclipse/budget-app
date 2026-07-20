@@ -33,7 +33,7 @@ export default function AiAdvisorPanel() {
       setCurrentResult(response);
       dispatch({
         type: 'ADD_ANALYSIS',
-        payload: { id: uuidv4(), timestamp: new Date().toISOString(), month, response },
+        payload: { id: uuidv4(), timestamp: new Date().toISOString(), month, response, provider: effectiveProvider },
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Analysis failed. Please try again.');
@@ -167,7 +167,7 @@ export default function AiAdvisorPanel() {
             <div key={analysis.id} className="card-hover bg-white dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/40 shadow-[0_1px_3px_rgba(0,0,0,0.02)] rounded-[20px] p-7 lg:p-8">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">
-                  {formatMonth(analysis.month)} &middot; {new Date(analysis.timestamp).toLocaleDateString()}
+                  {formatMonth(analysis.month)} &middot; {new Date(analysis.timestamp).toLocaleDateString()}{analysis.provider ? ` · ${analysis.provider}` : ''}
                 </span>
                 <button
                   onClick={() => setCurrentResult(analysis.response)}
