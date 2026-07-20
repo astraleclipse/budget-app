@@ -66,10 +66,13 @@ export default function Dashboard() {
     for (const tx of state.transactions) {
       months.add(tx.date.substring(0, 7));
     }
-    const current = getCurrentMonth();
-    months.add(current);
+    // Include months that have budget limits set (e.g. future months from copy-forward)
+    for (const bl of state.budgetLimits) {
+      if (bl.month.length === 7) months.add(bl.month);
+    }
+    months.add(getCurrentMonth());
     return [...months].sort().reverse();
-  }, [state.transactions]);
+  }, [state.transactions, state.budgetLimits]);
 
   const earliestMonth = availableMonths.length > 0 ? availableMonths[availableMonths.length - 1] : selectedMonth;
   const latestMonth = availableMonths.length > 0 ? availableMonths[0] : selectedMonth;

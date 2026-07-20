@@ -18,6 +18,7 @@ export default function BudgetsPage() {
   const [copyFromPeriod, setCopyFromPeriod] = useState('');
   const [copyForwardMonths, setCopyForwardMonths] = useState(1);
   const [copiedForward, setCopiedForward] = useState(false);
+  const [showCopyForwardWarning, setShowCopyForwardWarning] = useState(false);
 
   // Inline category name editing
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
@@ -55,6 +56,7 @@ export default function BudgetsPage() {
     }
     setCopied(false);
     setCopiedForward(false);
+    setShowCopyForwardWarning(false);
   };
 
   // Available periods from transactions + current period
@@ -134,7 +136,9 @@ export default function BudgetsPage() {
     bl => bl.month === period && bl.month.length === expectedLen
   );
 
-  const handleCopyForward = () => {
+  // Compute which target periods already have budgets (for the overwrite warning)
+  const copyForwardTargets = useMemo(() => {
+    const targets: { period: string; hasExisting: boolean }[] = [];
     for (let i = 1; i <= copyForwardMonths; i++) {
       let targetPeriod: string;
       if (isYearly) {
@@ -143,6 +147,18 @@ export default function BudgetsPage() {
         const [y, m] = period.split('-').map(Number);
         targetPeriod = format(addMonths(new Date(y, m - 1), i), 'yyyy-MM');
       }
+      const hasExisting = state.budgetLimits.some(
+        bl => bl.month === targetPeriod && bl.month.length === expectedLen
+      );
+      targets.push({ period: targetPeriod, hasExisting });
+    }
+    return targets;
+  }, [period, copyForwardMonths, isYearly, state.budgetLimits, expectedLen]);
+
+  const copyForwardWillOverwrite = copyForwardTargets.some(t => t.hasExisting);
+
+  const executeCopyForward = () => {
+    for (const { period: targetPeriod } of copyForwardTargets) {
       for (const bl of currentPeriodBudgets) {
         dispatch({
           type: 'SET_BUDGET_LIMIT',
@@ -150,8 +166,17 @@ export default function BudgetsPage() {
         });
       }
     }
+    setShowCopyForwardWarning(false);
     setCopiedForward(true);
     setTimeout(() => setCopiedForward(false), 3000);
+  };
+
+  const handleCopyForward = () => {
+    if (copyForwardWillOverwrite) {
+      setShowCopyForwardWarning(true);
+    } else {
+      executeCopyForward();
+    }
   };
 
   const handleSetLimit = (e: React.FormEvent) => {
@@ -194,7 +219,7 @@ export default function BudgetsPage() {
 
         <select
           value={period}
-          onChange={e => { setPeriod(e.target.value); setCopied(false); setCopiedForward(false); }}
+          onChange={e => { setPeriod(e.target.value); setCopied(false); setCopiedForward(false); setShowCopyForwardWarning(false); }}
           className="text-lg font-semibold text-slate-900 dark:text-white bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent cursor-pointer"
         >
           {availablePeriods.map(p => (
@@ -215,7 +240,7 @@ export default function BudgetsPage() {
 
         {period !== getCurrentPeriod(budgetMode) && (
           <button
-            onClick={() => { setPeriod(getCurrentPeriod(budgetMode)); setCopied(false); setCopiedForward(false); }}
+            onClick={() => { setPeriod(getCurrentPeriod(budgetMode)); setCopied(false); setCopiedForward(false); setShowCopyForwardWarning(false); }}
             className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
           >
             Go to current
@@ -274,31 +299,64 @@ export default function BudgetsPage() {
 
       {/* Copy forward (shown when current period has budgets) */}
       {periodHasBudgets && (
-        <div className="flex flex-wrap items-center gap-4 p-5 bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-700/40 rounded-[20px]">
-          <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-700/60 flex items-center justify-center shrink-0">
-            <svg className="w-4 h-4 text-slate-500 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-            </svg>
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-4 p-5 bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-700/40 rounded-[20px]">
+            <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-700/60 flex items-center justify-center shrink-0">
+              <svg className="w-4 h-4 text-slate-500 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+              </svg>
+            </div>
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300 flex-1 min-w-0">Copy this period's budgets forward</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                value={copyForwardMonths}
+                onChange={e => { setCopyForwardMonths(Number(e.target.value)); setShowCopyForwardWarning(false); }}
+                className="text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 text-slate-800 dark:text-slate-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              >
+                {[1,2,3,6,9,12].map(n => (
+                  <option key={n} value={n}>{n} {isYearly ? (n === 1 ? 'year' : 'years') : (n === 1 ? 'month' : 'months')}</option>
+                ))}
+              </select>
+              <button
+                onClick={handleCopyForward}
+                disabled={copiedForward}
+                className="px-4 py-2 bg-slate-700 dark:bg-slate-600 hover:bg-slate-800 dark:hover:bg-slate-500 disabled:opacity-60 text-white rounded-xl text-sm font-medium transition-colors whitespace-nowrap"
+              >
+                {copiedForward ? '✓ Done' : 'Copy Forward'}
+              </button>
+            </div>
           </div>
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-300 flex-1 min-w-0">Copy this period's budgets forward</p>
-          <div className="flex items-center gap-2 flex-wrap">
-            <select
-              value={copyForwardMonths}
-              onChange={e => setCopyForwardMonths(Number(e.target.value))}
-              className="text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 text-slate-800 dark:text-slate-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            >
-              {[1,2,3,6,9,12].map(n => (
-                <option key={n} value={n}>{n} {isYearly ? (n === 1 ? 'year' : 'years') : (n === 1 ? 'month' : 'months')}</option>
-              ))}
-            </select>
-            <button
-              onClick={handleCopyForward}
-              disabled={copiedForward}
-              className="px-4 py-2 bg-slate-700 dark:bg-slate-600 hover:bg-slate-800 dark:hover:bg-slate-500 disabled:opacity-60 text-white rounded-xl text-sm font-medium transition-colors whitespace-nowrap"
-            >
-              {copiedForward ? '✓ Done' : 'Copy Forward'}
-            </button>
-          </div>
+
+          {/* Overwrite warning */}
+          {showCopyForwardWarning && (
+            <div className="flex flex-wrap items-center gap-4 p-5 bg-amber-50 dark:bg-amber-500/10 border border-amber-200/60 dark:border-amber-500/20 rounded-[20px]">
+              <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center shrink-0">
+                <svg className="w-4 h-4 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-amber-900 dark:text-amber-200">Existing budgets will be overwritten</p>
+                <p className="text-xs text-amber-700/70 dark:text-amber-300/60 mt-0.5">
+                  {copyForwardTargets.filter(t => t.hasExisting).map(t => formatPeriod(t.period)).join(', ')} already {copyForwardTargets.filter(t => t.hasExisting).length === 1 ? 'has' : 'have'} budgets set.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowCopyForwardWarning(false)}
+                  className="px-3 py-2 text-sm font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/20 rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={executeCopyForward}
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-medium transition-colors"
+                >
+                  Overwrite & Copy
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

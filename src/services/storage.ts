@@ -1,8 +1,16 @@
-import type { BudgetState, Category } from '../types';
+import type { BudgetState, BudgetLimit, Category } from '../types';
 import { DEFAULT_CATEGORIES } from '../constants/categories';
 import { format } from 'date-fns';
 
 const STORAGE_KEY = 'budget-app:state';
+
+function deduplicateBudgetLimits(limits: BudgetLimit[]): BudgetLimit[] {
+  const seen = new Map<string, BudgetLimit>();
+  for (const bl of limits) {
+    seen.set(`${bl.categoryId}::${bl.month}`, bl);
+  }
+  return [...seen.values()];
+}
 
 function mergeWithDefaultCategories(categories: Category[]): Category[] {
   const savedIds = new Set(categories.map(c => c.id));
@@ -21,7 +29,7 @@ function normalizeState(data: Partial<BudgetState>): BudgetState {
     ...data,
     transactions: Array.isArray(data.transactions) ? data.transactions : [],
     categories: mergeWithDefaultCategories(categories),
-    budgetLimits: Array.isArray(data.budgetLimits) ? data.budgetLimits : [],
+    budgetLimits: Array.isArray(data.budgetLimits) ? deduplicateBudgetLimits(data.budgetLimits) : [],
     analyses: Array.isArray(data.analyses) ? data.analyses : [],
     recurringTransactions: Array.isArray(data.recurringTransactions) ? data.recurringTransactions : [],
     savingsGoals: Array.isArray(data.savingsGoals) ? data.savingsGoals : [],
