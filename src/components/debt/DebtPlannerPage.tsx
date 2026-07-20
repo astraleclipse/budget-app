@@ -19,6 +19,7 @@ function DebtForm({ open, onClose, onSave, edit }: DebtFormProps) {
   const [balance, setBalance] = useState('');
   const [apr, setApr] = useState('');
   const [minimumPayment, setMinimumPayment] = useState('');
+  const [paymentDueDay, setPaymentDueDay] = useState('');
 
   useMemo(() => {
     if (!open) return;
@@ -26,6 +27,7 @@ function DebtForm({ open, onClose, onSave, edit }: DebtFormProps) {
     setBalance(edit ? String(edit.balance) : '');
     setApr(edit ? String(edit.apr) : '');
     setMinimumPayment(edit ? String(edit.minimumPayment) : '');
+    setPaymentDueDay(edit?.paymentDueDay ? String(edit.paymentDueDay) : '');
   }, [open, edit]);
 
   const inputCls = 'w-full px-5 py-4 rounded-2xl border border-slate-200 dark:border-slate-700/50 bg-slate-50/50 dark:bg-slate-900/30 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent';
@@ -36,7 +38,11 @@ function DebtForm({ open, onClose, onSave, edit }: DebtFormProps) {
     const parsedBalance = parseFloat(balance);
     const parsedApr = parseFloat(apr);
     const parsedMin = parseFloat(minimumPayment);
+    const parsedDueDay = paymentDueDay ? parseInt(paymentDueDay, 10) : undefined;
     if (!name.trim() || isNaN(parsedBalance) || parsedBalance < 0 || isNaN(parsedApr) || parsedApr < 0 || isNaN(parsedMin) || parsedMin <= 0) {
+      return;
+    }
+    if (parsedDueDay !== undefined && (isNaN(parsedDueDay) || parsedDueDay < 1 || parsedDueDay > 31)) {
       return;
     }
     const now = new Date().toISOString();
@@ -46,6 +52,7 @@ function DebtForm({ open, onClose, onSave, edit }: DebtFormProps) {
       balance: parsedBalance,
       apr: parsedApr,
       minimumPayment: parsedMin,
+      paymentDueDay: parsedDueDay,
       createdAt: edit?.createdAt ?? now,
       updatedAt: now,
     });
@@ -72,6 +79,10 @@ function DebtForm({ open, onClose, onSave, edit }: DebtFormProps) {
         <div>
           <label className={labelCls}>Minimum monthly payment</label>
           <input className={inputCls} type="number" min="0.01" step="0.01" value={minimumPayment} onChange={e => setMinimumPayment(e.target.value)} required />
+        </div>
+        <div>
+          <label className={labelCls}>Payment due day (optional)</label>
+          <input className={inputCls} type="number" min="1" max="31" step="1" value={paymentDueDay} onChange={e => setPaymentDueDay(e.target.value)} placeholder="e.g. 15" />
         </div>
         <div className="flex gap-3 pt-2">
           <button type="button" onClick={onClose} className="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-700/60 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/60 font-medium text-sm transition-colors">
@@ -179,7 +190,7 @@ export default function DebtPlannerPage() {
               <div key={a.id} className="rounded-xl border border-slate-200/80 dark:border-slate-700/50 bg-slate-50/60 dark:bg-slate-900/20 px-4 py-3 flex items-center gap-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{a.name}</p>
-                  <p className="text-xs text-slate-400 dark:text-slate-500">APR {a.apr.toFixed(2)}% · Min {formatCurrency(a.minimumPayment)}</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500">APR {a.apr.toFixed(2)}% · Min {formatCurrency(a.minimumPayment)}{a.paymentDueDay ? ` · Due day ${a.paymentDueDay}` : ''}</p>
                 </div>
                 <p className="text-sm font-semibold text-rose-600 dark:text-rose-400">{formatCurrency(a.balance)}</p>
                 <button onClick={() => { setEditing(a); setShowForm(true); }} className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">Edit</button>

@@ -19,6 +19,10 @@ export default function BudgetsPage() {
   const [copyForwardMonths, setCopyForwardMonths] = useState(1);
   const [copiedForward, setCopiedForward] = useState(false);
   const [showCopyForwardWarning, setShowCopyForwardWarning] = useState(false);
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [templateApplied, setTemplateApplied] = useState(false);
 
   // Inline category name editing
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
@@ -57,6 +61,7 @@ export default function BudgetsPage() {
     setCopied(false);
     setCopiedForward(false);
     setShowCopyForwardWarning(false);
+    setTemplateApplied(false);
   };
 
   // Available periods from transactions + current period
@@ -135,6 +140,8 @@ export default function BudgetsPage() {
   const currentPeriodBudgets = state.budgetLimits.filter(
     bl => bl.month === period && bl.month.length === expectedLen
   );
+  const availableTemplates = (state.budgetTemplates ?? []).filter(template => template.budgetMode === budgetMode);
+  const selectedTemplate = availableTemplates.find(template => template.id === selectedTemplateId) ?? availableTemplates[0];
 
   // Compute which target periods already have budgets (for the overwrite warning)
   const copyForwardTargets = useMemo(() => {
@@ -179,6 +186,41 @@ export default function BudgetsPage() {
     }
   };
 
+  const handleSaveTemplate = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmedName = templateName.trim();
+    if (!trimmedName || currentPeriodBudgets.length === 0) return;
+    const now = new Date().toISOString();
+    dispatch({
+      type: 'ADD_BUDGET_TEMPLATE',
+      payload: {
+        id: `${budgetMode}-${Date.now()}`,
+        name: trimmedName,
+        budgetMode,
+        lines: currentPeriodBudgets.map(limit => ({
+          categoryId: limit.categoryId,
+          monthlyLimit: limit.monthlyLimit,
+        })),
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+    setTemplateName('');
+    setShowSaveTemplate(false);
+  };
+
+  const handleApplyTemplate = () => {
+    if (!selectedTemplate) return;
+    for (const line of selectedTemplate.lines) {
+      dispatch({
+        type: 'SET_BUDGET_LIMIT',
+        payload: { categoryId: line.categoryId, monthlyLimit: line.monthlyLimit, month: period },
+      });
+    }
+    setTemplateApplied(true);
+    setTimeout(() => setTemplateApplied(false), 3000);
+  };
+
   const handleSetLimit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editCat) return;
@@ -219,7 +261,7 @@ export default function BudgetsPage() {
 
         <select
           value={period}
-          onChange={e => { setPeriod(e.target.value); setCopied(false); setCopiedForward(false); setShowCopyForwardWarning(false); }}
+          onChange={e => { setPeriod(e.target.value); setCopied(false); setCopiedForward(false); setShowCopyForwardWarning(false); setTemplateApplied(false); }}
           className="text-lg font-semibold text-slate-900 dark:text-white bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent cursor-pointer"
         >
           {availablePeriods.map(p => (
@@ -240,7 +282,7 @@ export default function BudgetsPage() {
 
         {period !== getCurrentPeriod(budgetMode) && (
           <button
-            onClick={() => { setPeriod(getCurrentPeriod(budgetMode)); setCopied(false); setCopiedForward(false); setShowCopyForwardWarning(false); }}
+            onClick={() => { setPeriod(getCurrentPeriod(budgetMode)); setCopied(false); setCopiedForward(false); setShowCopyForwardWarning(false); setTemplateApplied(false); }}
             className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
           >
             Go to current
@@ -251,6 +293,58 @@ export default function BudgetsPage() {
           {budgetMode} mode
         </span>
       </div>
+
+      <div className="flex flex-wrap items-center gap-3 p-5 bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-700/40 rounded-[20px]">
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-slate-900 dark:text-white">Budget Templates</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Save the current budget setup once, then re-apply it to future periods.</p>
+        </div>
+        <button
+          onClick={() => setShowSaveTemplate(true)}
+          disabled={currentPeriodBudgets.length === 0}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-xl text-sm font-medium transition-colors"
+        >
+          Save Current as Template
+        </button>
+        <select
+          value={selectedTemplate?.id ?? ''}
+          onChange={e => setSelectedTemplateId(e.target.value)}
+          className="text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 text-slate-800 dark:text-slate-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+        >
+          <option value="">Select template...</option>
+          {availableTemplates.map(template => (
+            <option key={template.id} value={template.id}>{template.name}</option>
+          ))}
+        </select>
+        <button
+          onClick={handleApplyTemplate}
+          disabled={!selectedTemplate}
+          className="px-4 py-2 border border-slate-200 dark:border-slate-700/60 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/40 disabled:opacity-60 rounded-xl text-sm font-medium transition-colors"
+        >
+          Apply Template
+        </button>
+        {selectedTemplate && (
+          <button
+            onClick={() => dispatch({ type: 'DELETE_BUDGET_TEMPLATE', payload: selectedTemplate.id })}
+            className="px-4 py-2 border border-rose-200 dark:border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl text-sm font-medium transition-colors"
+          >
+            Delete Template
+          </button>
+        )}
+      </div>
+
+      {templateApplied && selectedTemplate && (
+        <div className="flex items-center gap-4 p-6 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200/60 dark:border-emerald-500/15 rounded-[20px]">
+          <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center shrink-0">
+            <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <p className="text-sm font-medium text-emerald-900 dark:text-emerald-200">
+            Applied template "{selectedTemplate.name}" to {formatPeriod(period)}.
+          </p>
+        </div>
+      )}
 
       {/* Copy from any period (shown when no budgets set) */}
       {canCopyFrom && !copied && (
@@ -423,6 +517,32 @@ export default function BudgetsPage() {
                           </svg>
                         </p>
                       )}
+
+                      <Modal open={showSaveTemplate} onClose={() => { setShowSaveTemplate(false); setTemplateName(''); }} title="Save Budget Template">
+                        <form onSubmit={handleSaveTemplate} className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Template name</label>
+                            <input
+                              value={templateName}
+                              onChange={e => setTemplateName(e.target.value)}
+                              placeholder="e.g. Default Monthly Budget"
+                              className="w-full px-5 py-4 rounded-2xl border border-slate-200 dark:border-slate-700/50 bg-slate-50/50 dark:bg-slate-900/30 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                              required
+                            />
+                          </div>
+                          <p className="text-xs text-slate-400 dark:text-slate-500">
+                            This will save {currentPeriodBudgets.length} budget line{currentPeriodBudgets.length === 1 ? '' : 's'} from {formatPeriod(period)}.
+                          </p>
+                          <div className="flex gap-3 pt-2">
+                            <button type="button" onClick={() => { setShowSaveTemplate(false); setTemplateName(''); }} className="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-700/60 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/60 font-medium text-sm transition-colors">
+                              Cancel
+                            </button>
+                            <button type="submit" className="flex-1 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm transition-colors shadow-sm shadow-indigo-500/25">
+                              Save Template
+                            </button>
+                          </div>
+                        </form>
+                      </Modal>
                       <p className="text-xs text-slate-400 dark:text-slate-500">
                         {data?.count || 0} transaction{(data?.count || 0) !== 1 ? 's' : ''}
                       </p>

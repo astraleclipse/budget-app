@@ -1,11 +1,15 @@
 import { createContext, useContext, useReducer, useEffect, type ReactNode } from 'react';
 import type { BudgetState, BudgetAction } from '../types';
 import { loadState, saveState, getDefaultState } from '../services/storage';
+import { applyTransactionRule, applyTransactionRules } from '../utils/transactionRules';
 
 function budgetReducer(state: BudgetState, action: BudgetAction): BudgetState {
   switch (action.type) {
     case 'ADD_TRANSACTION':
-      return { ...state, transactions: [...state.transactions, action.payload] };
+      return {
+        ...state,
+        transactions: [...state.transactions, applyTransactionRule(action.payload, state.transactionRules || [])],
+      };
     case 'UPDATE_TRANSACTION':
       return {
         ...state,
@@ -51,7 +55,10 @@ function budgetReducer(state: BudgetState, action: BudgetAction): BudgetState {
         categories: state.categories.filter(c => c.id !== action.payload),
       };
     case 'BATCH_ADD_TRANSACTIONS':
-      return { ...state, transactions: [...state.transactions, ...action.payload] };
+      return {
+        ...state,
+        transactions: [...state.transactions, ...applyTransactionRules(action.payload, state.transactionRules || [])],
+      };
     case 'BATCH_UPDATE_TRANSACTIONS': {
       const updates = new Map(action.payload.map(t => [t.id, t]));
       return {
@@ -121,6 +128,48 @@ function budgetReducer(state: BudgetState, action: BudgetAction): BudgetState {
       return {
         ...state,
         debtAccounts: (state.debtAccounts || []).filter(d => d.id !== action.payload),
+      };
+    case 'ADD_ASSET_ACCOUNT':
+      return { ...state, assetAccounts: [...(state.assetAccounts || []), action.payload] };
+    case 'UPDATE_ASSET_ACCOUNT':
+      return {
+        ...state,
+        assetAccounts: (state.assetAccounts || []).map(a =>
+          a.id === action.payload.id ? action.payload : a
+        ),
+      };
+    case 'DELETE_ASSET_ACCOUNT':
+      return {
+        ...state,
+        assetAccounts: (state.assetAccounts || []).filter(a => a.id !== action.payload),
+      };
+    case 'ADD_TRANSACTION_RULE':
+      return { ...state, transactionRules: [...(state.transactionRules || []), action.payload] };
+    case 'UPDATE_TRANSACTION_RULE':
+      return {
+        ...state,
+        transactionRules: (state.transactionRules || []).map(r =>
+          r.id === action.payload.id ? action.payload : r
+        ),
+      };
+    case 'DELETE_TRANSACTION_RULE':
+      return {
+        ...state,
+        transactionRules: (state.transactionRules || []).filter(r => r.id !== action.payload),
+      };
+    case 'ADD_BUDGET_TEMPLATE':
+      return { ...state, budgetTemplates: [...(state.budgetTemplates || []), action.payload] };
+    case 'UPDATE_BUDGET_TEMPLATE':
+      return {
+        ...state,
+        budgetTemplates: (state.budgetTemplates || []).map(t =>
+          t.id === action.payload.id ? action.payload : t
+        ),
+      };
+    case 'DELETE_BUDGET_TEMPLATE':
+      return {
+        ...state,
+        budgetTemplates: (state.budgetTemplates || []).filter(t => t.id !== action.payload),
       };
     case 'ADD_SCHEDULED_ACTION':
       return { ...state, scheduledActions: [...(state.scheduledActions || []), action.payload] };
