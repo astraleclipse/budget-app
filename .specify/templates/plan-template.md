@@ -40,7 +40,20 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+Verify each principle before proceeding:
+
+- [ ] **I. Local-First Data** — Does this feature store or transmit data outside `localStorage`?
+  If yes, it requires an explicit architectural decision and constitution amendment.
+- [ ] **II. Component-Driven Architecture** — Does new UI live in a feature folder under
+  `src/components/`? Does shared logic go to `src/utils/` or `src/services/`?
+- [ ] **III. Type Safety** — Are all new entities typed in `src/types/index.ts`?
+  Is `any` usage eliminated or justified?
+- [ ] **IV. Unit-Test Coverage** — Are Vitest tests planned for all new utility/service functions?
+- [ ] **V. AI as Optional Enhancement** — If AI is involved, does the feature work without a
+  provider configured? Are all providers handled equivalently?
+- [ ] **VI. Simplicity & UX Clarity** — Does every side-effecting action provide feedback?
+  Are destructive actions guarded with confirmation prompts? Are period-based entities
+  unique per period?
 
 ## Project Structure
 
